@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mapa do Direito — Simulador de Elegibilidade</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header>
+    <h1>Mapa do Direito</h1>
+    <p>
+      Simule, de forma anônima, a quais programas sociais a família pode ter direito.
+      Nenhum dado é salvo — esta é a rota pública
+      <code>POST /api/v1/elegibilidade/simular</code>.
+    </p>
+  </header>
+
+  <main>
+    <form id="form-simulacao" novalidate>
+      <fieldset>
+        <legend>Dados da família</legend>
+
+        <p>
+          <label for="municipio">Município *</label><br>
+          <input type="text" id="municipio" name="municipio" maxlength="120" required
+                 autocomplete="address-level2" placeholder="Salvador">
+        </p>
+
+        <p>
+          <label for="uf">UF *</label><br>
+          <input type="text" id="uf" name="uf" minlength="2" maxlength="2"
+                 pattern="[A-Za-z]{2}" required autocomplete="address-level1" placeholder="BA">
+        </p>
+
+        <p>
+          <label for="renda_total_mensal">Renda total mensal da família (R$)</label><br>
+          <input type="number" id="renda_total_mensal" name="renda_total_mensal"
+                 min="0" step="0.01" value="0">
+        </p>
+
+        <p>
+          <label for="situacao_moradia">Situação de moradia</label><br>
+          <select id="situacao_moradia" name="situacao_moradia">
+            <option value="propria">Própria</option>
+            <option value="alugada" selected>Alugada</option>
+            <option value="cedida">Cedida</option>
+            <option value="situacao_rua">Situação de rua</option>
+          </select>
+        </p>
+
+        <p>
+          <label class="campo-checkbox">
+            <input type="checkbox" id="possui_cadunico" name="possui_cadunico">
+            A família está inscrita no Cadastro Único (CadÚnico)
+          </label>
+        </p>
+      </fieldset>
+
+      <fieldset>
+        <legend>Membros da família</legend>
+        <p>Informe ao menos uma pessoa da família (campos com * são obrigatórios).</p>
+
+        <div id="lista-membros"></div>
+
+        <p>
+          <button type="button" id="btn-add-membro">+ Adicionar pessoa</button>
+        </p>
+      </fieldset>
+
+      <p>
+        <button type="submit" id="btn-simular">Simular elegibilidade</button>
+      </p>
+    </form>
+
+    <div id="erro" role="alert" hidden></div>
+
+    <output id="resultado" aria-live="polite"></output>
+  </main>
+
+  <template id="template-membro">
+    <fieldset class="membro">
+      <legend>Pessoa</legend>
+
+      <p>
+        <label>Nome (apenas o primeiro nome) *<br>
+          <input type="text" class="campo-nome" maxlength="80" required autocomplete="given-name">
+        </label>
+      </p>
+
+      <p>
+        <label>Data de nascimento *<br>
+          <input type="date" class="campo-nascimento" required>
+        </label>
+      </p>
+
+      <p>
+        <label>Parentesco com o responsável<br>
+          <select class="campo-parentesco">
+            <option value="responsavel">Responsável</option>
+            <option value="conjuge">Cônjuge</option>
+            <option value="filho">Filho(a)</option>
+            <option value="pai">Pai</option>
+            <option value="mae">Mãe</option>
+            <option value="outro" selected>Outro</option>
+          </select>
+        </label>
+      </p>
+
+      <p>
+        <label>Escolaridade (opcional)<br>
+          <input type="text" class="campo-escolaridade">
+        </label>
+      </p>
+
+      <p>
+        <label>Renda individual mensal (R$)<br>
+          <input type="number" class="campo-renda" min="0" step="0.01" value="0">
+        </label>
+      </p>
+
+      <p>
+        <label class="campo-checkbox"><input type="checkbox" class="campo-pcd"> Possui deficiência</label>
+      </p>
+      <p>
+        <label class="campo-checkbox"><input type="checkbox" class="campo-gestante"> Gestante</label>
+      </p>
+      <p>
+        <label class="campo-checkbox"><input type="checkbox" class="campo-escola"> Frequenta a escola</label>
+      </p>
+
+      <p>
+        <button type="button" class="btn-remover-membro">Remover esta pessoa</button>
+      </p>
+    </fieldset>
+  </template>
+
+  <script src="script.js"></script>
+</body>
+</html>

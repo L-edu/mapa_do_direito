@@ -1,0 +1,999 @@
+{
+  "info": {
+    "name": "Mapa do Direito — API de elegibilidade (ODS 1)",
+    "description": "\nAPI que identifica a quais programas de transferência de renda e benefícios sociais\numa família tem direito, e — quando ainda não tem — **exatamente o que falta** para\nse enquadrar.\n\n### Problema\nParte significativa das famílias em situação de vulnerabilidade não acessa benefícios\naos quais já teria direito, por desconhecimento dos critérios ou por pendências\ncadastrais simples. O caminho inverso também ocorre: pessoas tentam o benefício,\nsão negadas e não recebem orientação sobre o motivo.\n\n### Como funciona\nAs regras de elegibilidade **não estão codificadas em `if/else`**: ficam no banco como\ndados declarativos (`campo` + `operador` + `valor`). Isso permite cadastrar um programa\nnovo ou reajustar um limite de renda sem alterar uma linha de código.\n\n### Papéis\n| Papel | Permissões |\n|---|---|\n| `cidadao` | Simulação anônima e consulta ao catálogo |\n| `assistente_social` | Cadastro de famílias e simulações com histórico |\n| `admin` | Gestão de programas, regras, parâmetros e relatórios |\n\n### Privacidade\nEm conformidade com a LGPD, a API **não recebe nem armazena CPF, NIS ou qualquer\nidentificador direto**. Cada família recebe um código interno opaco.\n",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:8000"
+    },
+    {
+      "key": "token",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "Autenticação",
+      "item": [
+        {
+          "name": "Cria uma nova conta",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/auth/registrar",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "registrar"
+              ]
+            },
+            "description": "Cadastro público. O papel `admin` é ignorado neste endpoint: contas administrativas são criadas pelo seed ou promovidas por outro administrador.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nome\": \"Assistente Teste\",\n  \"email\": \"teste@exemplo.org\",\n  \"senha\": \"senhaSegura123\",\n  \"papel\": \"assistente_social\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Autentica e devolve o token JWT",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/auth/login",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "login"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"admin@mapadodireito.org\",\n  \"senha\": \"admin12345\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const dados = pm.response.json();",
+                  "if (dados.access_token) {",
+                  "  pm.collectionVariables.set('token', dados.access_token);",
+                  "  console.log('Token salvo na variável {{token}}');",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Dados do usuário autenticado",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/auth/me",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "me"
+              ]
+            },
+            "description": ""
+          }
+        }
+      ]
+    },
+    {
+      "name": "Programas",
+      "item": [
+        {
+          "name": "Lista os programas do catálogo",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/programas",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "programas"
+              ]
+            },
+            "description": "Endpoint público e paginado. Aceita filtros por esfera, situação e texto livre."
+          }
+        },
+        {
+          "name": "Cadastra um programa (admin)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/programas",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "programas"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Detalha um programa e suas regras",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/programas/{programa_id}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "programas",
+                "{programa_id}"
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Atualiza um programa (admin)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/programas/{programa_id}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "programas",
+                "{programa_id}"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Desativa um programa (admin)",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/programas/{programa_id}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "programas",
+                "{programa_id}"
+              ]
+            },
+            "description": "Exclusão lógica: o histórico de simulações continua íntegro."
+          }
+        },
+        {
+          "name": "Requisitos em linguagem simples",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/programas/{programa_id}/requisitos",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "programas",
+                "{programa_id}",
+                "requisitos"
+              ]
+            },
+            "description": "Traduz as regras declarativas para frases legíveis por qualquer cidadão."
+          }
+        },
+        {
+          "name": "Adiciona uma regra de elegibilidade (admin)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/programas/{programa_id}/regras",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "programas",
+                "{programa_id}",
+                "regras"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Remove uma regra (admin)",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/regras/{regra_id}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "regras",
+                "{regra_id}"
+              ]
+            },
+            "description": ""
+          }
+        }
+      ]
+    },
+    {
+      "name": "Famílias",
+      "item": [
+        {
+          "name": "Cadastra uma família",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/familias",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "familias"
+              ]
+            },
+            "description": "Disponível para assistentes sociais e administradores. Por conformidade com a LGPD, a API não recebe CPF, NIS ou qualquer identificador direto: a família recebe um código interno opaco.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"municipio\": \"Salvador\",\n  \"uf\": \"BA\",\n  \"renda_total_mensal\": 600.0,\n  \"situacao_moradia\": \"cedida\",\n  \"possui_cadunico\": true,\n  \"membros\": [\n    {\n      \"nome\": \"Ana\",\n      \"data_nascimento\": \"1988-02-10\",\n      \"parentesco\": \"responsavel\"\n    },\n    {\n      \"nome\": \"Lucas\",\n      \"data_nascimento\": \"2012-06-05\",\n      \"parentesco\": \"filho\"\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Lista famílias cadastradas",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/familias",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "familias"
+              ]
+            },
+            "description": "Administradores veem todas; assistentes sociais veem apenas os próprios cadastros."
+          }
+        },
+        {
+          "name": "Detalha uma família com o perfil calculado",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/familias/{familia_id}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "familias",
+                "{familia_id}"
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Atualiza os dados da família",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/familias/{familia_id}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "familias",
+                "{familia_id}"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Exclui a família e todo o seu histórico (admin)",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/familias/{familia_id}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "familias",
+                "{familia_id}"
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Adiciona um membro à família",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/familias/{familia_id}/membros",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "familias",
+                "{familia_id}",
+                "membros"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Lista os membros da família",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/familias/{familia_id}/membros",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "familias",
+                "{familia_id}",
+                "membros"
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Atualiza um membro",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/membros/{membro_id}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "membros",
+                "{membro_id}"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Remove um membro",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/membros/{membro_id}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "membros",
+                "{membro_id}"
+              ]
+            },
+            "description": ""
+          }
+        }
+      ]
+    },
+    {
+      "name": "Elegibilidade",
+      "item": [
+        {
+          "name": "Simula a elegibilidade sem cadastro (público)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/elegibilidade/simular",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "elegibilidade",
+                "simular"
+              ]
+            },
+            "description": "Avalia o perfil informado contra todos os programas ativos e devolve, para cada um, se a família é elegível, quais requisitos já são atendidos e, quando não é elegível, exatamente o que falta. Nenhum dado é gravado.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"municipio\": \"Salvador\",\n  \"uf\": \"BA\",\n  \"renda_total_mensal\": 800.0,\n  \"situacao_moradia\": \"alugada\",\n  \"possui_cadunico\": true,\n  \"membros\": [\n    {\n      \"nome\": \"Maria\",\n      \"data_nascimento\": \"1990-03-12\",\n      \"parentesco\": \"responsavel\",\n      \"gestante\": true\n    },\n    {\n      \"nome\": \"Joana\",\n      \"data_nascimento\": \"2019-08-01\",\n      \"parentesco\": \"filho\"\n    },\n    {\n      \"nome\": \"Antônio\",\n      \"data_nascimento\": \"1955-01-20\",\n      \"parentesco\": \"pai\",\n      \"possui_deficiencia\": true\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Simula e registra o resultado no histórico da família",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/familias/{familia_id}/simulacoes",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "familias",
+                "{familia_id}",
+                "simulacoes"
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Histórico de simulações da família",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/familias/{familia_id}/simulacoes",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "familias",
+                "{familia_id}",
+                "simulacoes"
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Resultado detalhado de uma simulação",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/simulacoes/{simulacao_id}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "simulacoes",
+                "{simulacao_id}"
+              ]
+            },
+            "description": ""
+          }
+        }
+      ]
+    },
+    {
+      "name": "Gestão",
+      "item": [
+        {
+          "name": "Valores de referência vigentes",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/parametros",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "parametros"
+              ]
+            },
+            "description": "Salário mínimo, linha de pobreza e demais valores usados pelas regras. Atualizar um parâmetro reajusta automaticamente todas as regras derivadas dele."
+          }
+        },
+        {
+          "name": "Atualiza ou cria um parâmetro (admin)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/parametros/{chave}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "parametros",
+                "{chave}"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"valor\": 1621.0,\n  \"descricao\": \"Salário mínimo vigente\",\n  \"fonte\": \"Decreto federal\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Cobertura potencial por programa (admin)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/relatorios/cobertura",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "relatorios",
+                "cobertura"
+              ]
+            },
+            "description": "Reavalia todas as famílias cadastradas e informa quantas seriam elegíveis a cada programa. Indicador de referência para o monitoramento da meta 1.3 do ODS 1."
+          }
+        },
+        {
+          "name": "Requisitos que mais reprovam (admin)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/relatorios/pendencias-frequentes",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "relatorios",
+                "pendencias-frequentes"
+              ]
+            },
+            "description": "Ranking dos requisitos que mais bloqueiam o acesso a benefícios. Ajuda a direcionar busca ativa: se o campeão for a ausência de CadÚnico, o gargalo é cadastral, não de renda."
+          }
+        },
+        {
+          "name": "Healthcheck",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/health",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "health"
+              ]
+            },
+            "description": ""
+          }
+        }
+      ]
+    }
+  ]
+}
