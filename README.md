@@ -1,214 +1,150 @@
 # Mapa do Direito
 
-API de identificação de elegibilidade a programas sociais.
-**ODS 1 — Erradicação da Pobreza** · meta 1.3
+Aplicação web que identifica a quais programas sociais uma família tem direito e, quando ainda não tem,
+**mostra exatamente o que falta**. Vinculada ao **ODS 1 — Erradicação da Pobreza** (meta 1.3).
 
----
+- **Sprint 1 — API** (FastAPI + SQLAlchemy): pasta `app/`, testes em `tests/`.
+- **Sprint 2 — Front-end e integração** (React + Vite): pasta `frontend/`.
 
-## O problema
-
-Parte significativa das famílias em situação de vulnerabilidade **não acessa benefícios aos quais já teria direito**. As causas mais comuns não são de renda, e sim informacionais: desconhecimento dos critérios, cadastro desatualizado, ou uma negativa anterior sem qualquer orientação sobre o motivo.
-
-O resultado é duplo: a família permanece desprotegida, e o poder público perde capacidade de focalizar a busca ativa.
-
-## A solução
-
-Uma API que recebe o perfil socioeconômico de uma família e responde, para cada programa disponível:
-
-1. **se a família é elegível**;
-2. **quais requisitos já são atendidos**;
-3. quando não é elegível, **exatamente o que falta e quanto falta** — em linguagem simples.
-
-Essa terceira resposta é o diferencial. Um "não" sozinho não muda a vida de ninguém; *"a renda por pessoa está R$ 48,67 acima do limite"* ou *"basta atualizar o CadÚnico no CRAS"* muda.
-
-## Decisão de arquitetura: regras como dados
-
-As regras de elegibilidade **não estão codificadas em `if/else`**. Elas vivem no banco como registros declarativos:
-
-| campo | operador | valor | tipo_valor |
-|---|---|---|---|
-| `renda_per_capita` | `<=` | `limite_renda_bolsa_familia` | `parametro` |
-| `possui_cadunico` | `==` | `true` | `booleano` |
-| `renda_per_capita` | `<` | `0.25 * salario_minimo` | `parametro` |
-
-Consequências práticas:
-
-- **Cadastrar um programa novo** é uma chamada `POST /programas` — não um deploy.
-- **Reajustar o salário mínimo** é atualizar um único registro em `parametros`; todas as regras derivadas se ajustam sozinhas. Há um teste automatizado que prova isso (`test_atualizar_parametro_reajusta_regras`).
-- O motor de avaliação fica pequeno, puro e inteiramente testável sem banco nem HTTP.
-
-Regras que compartilham um `grupo_logico` são combinadas em **OR** entre si — é assim que o BPC representa *"ser idoso de 65 anos ou mais **ou** ser pessoa com deficiência"*.
-
-## Privacidade (LGPD)
-
-A API **não recebe nem armazena CPF, NIS, RG ou qualquer identificador direto**. Cada família recebe um código interno opaco derivado de um UUID com salt. Dos membros, guarda-se apenas o primeiro nome e os atributos estritamente necessários para avaliar o direito ao benefício. Trata-se de dado de população vulnerável: coletar menos é um requisito, não um detalhe.
-
-## Stack
-
-FastAPI · SQLAlchemy 2.0 · Pydantic v2 · SQLite (dev) / PostgreSQL (prod) · JWT · pytest
-
-## Como executar
-
-```bash
-python -m venv .venv && source .venv/bin/activate   # Windows: .venv\Scripts\activate
-pip install -r requirements.txt
-cp .env.example .env
-
-python -m app.seed                    # popula programas, regras, parâmetros e demo
-uvicorn app.main:app --reload
+```
+mapa-do-direito/
+├── app/            # API FastAPI (rotas, regras, modelos, segurança)
+├── tests/          # 48 testes automatizados da API
+├── frontend/       # Aplicação React (componentizada) que consome a API
+├── docs/           # Coleção Postman
+├── scripts/        # Gerador da coleção Postman a partir do OpenAPI
+└── .github/        # CI: testes da API + build do front
 ```
 
-- Swagger UI: http://localhost:8000/docs
-- ReDoc: http://localhost:8000/redoc
-- OpenAPI: http://localhost:8000/openapi.json
+## O problema e a solução
+
+Muitas famílias em vulnerabilidade não acessam benefícios aos quais já teriam direito: desconhecem os critérios, têm o
+cadastro desatualizado ou foram negadas sem explicação. O Mapa do Direito recebe o perfil da família e responde, para
+cada programa: **se é elegível**, **quais requisitos já cumpre** e **o que falta** (em linguagem simples).
+
+**Decisão de arquitetura — regras como dados.** As regras de elegibilidade não estão em `if/else`: ficam no banco
+(`campo` + `operador` + `valor`). Cadastrar um programa novo é uma chamada à API; reajustar o salário mínimo é atualizar
+um registro e todas as regras derivadas (1/4, 1/2, 2x o salário) passam a usar o novo valor. Regras com o mesmo
+`grupo_logico` são combinadas em **OU** (ex.: BPC = idoso 65+ **ou** pessoa com deficiência).
+
+**Privacidade (LGPD).** Não recebemos nem armazenamos CPF, NIS ou RG. A família recebe um código opaco e as pessoas são
+registradas só com o primeiro nome e os atributos necessários para avaliar o direito.
+
+## Como executar (Windows / PowerShell)
+
+Pré-requisitos: **Python 3.12+** e **Node.js 20+**. Use dois terminais.
+
+**Terminal 1 — API**
+
+```powershell
+python -m venv .venv
+.venv\Scripts\activate
+pip install -r requirements.txt
+copy .env.example .env
+python -m app.seed                      # cria tabelas, programas, regras, parâmetros e contas de demonstração
+uvicorn app.main:app --reload           # http://localhost:8000  (Swagger em /docs)
+```
+
+**Terminal 2 — Front-end**
+
+```powershell
+cd frontend
+npm install
+copy .env.example .env                  # opcional: só é preciso se a API não estiver em localhost:8000
+npm run dev                             # http://localhost:5173
+```
+
+> Linux/macOS: troque `.venv\Scripts\activate` por `source .venv/bin/activate` e `copy` por `cp`.
 
 ### Contas de demonstração
 
-| E-mail | Senha | Papel |
-|---|---|---|
-| `admin@mapadodireito.org` | `admin12345` | admin |
-| `cras@mapadodireito.org` | `cras12345` | assistente_social |
+| E-mail | Senha | Papel | O que pode fazer |
+|---|---|---|---|
+| `admin@mapadodireito.org` | `admin12345` | Administrador | Tudo: programas, regras, parâmetros, usuários, relatórios |
+| `cras@mapadodireito.org` | `cras12345` | Assistente social | Cadastrar famílias atendidas e simular com histórico |
+| `cidadao@mapadodireito.org` | `cidadao12345` | Cidadão | Cadastrar e simular a própria família |
 
-### Testes
+A tela de login tem botões que preenchem essas contas (desligue com `VITE_MOSTRAR_CONTAS_DEMO=false`).
+Quem cria conta pelo site entra sempre como **Cidadão**; só um administrador cria assistentes sociais e outros admins.
 
-```bash
-pytest -v          # 40 testes
+## Funcionalidades do front-end (Sprint 2)
+
+| Tela | Rota | Acesso | Operações na API |
+|---|---|---|---|
+| Início | `/` | público | `GET /programas` |
+| Simulador | `/simulador` | público | `POST /elegibilidade/simular` |
+| Login / Criar conta | `/login`, `/registro` | público | `POST /auth/login`, `POST /auth/registrar`, `GET /auth/me` |
+| Catálogo e requisitos | `/programas`, `/programas/:id` | público | `GET /programas`, `GET /programas/{id}`, `GET /programas/{id}/requisitos` |
+| Famílias (lista, filtros, paginação) | `/familias` | logado | `GET /familias`, `DELETE /familias/{id}` |
+| Cadastrar / editar família | `/familias/nova`, `/familias/:id/editar` | logado | `POST /familias`, `PUT /familias/{id}` |
+| Detalhe da família + pessoas | `/familias/:id` | logado | `GET /familias/{id}`, `POST /familias/{id}/membros`, `PUT/DELETE /membros/{id}` |
+| Simular com histórico | `/simulacoes/:id` | logado | `POST /familias/{id}/simulacoes`, `GET /familias/{id}/simulacoes`, `GET /simulacoes/{id}` |
+| Painel de gestão | `/admin` | admin | `GET /relatorios/cobertura`, `GET /relatorios/pendencias-frequentes` |
+| Parâmetros | `/admin/parametros` | admin | `GET /parametros`, `PUT /parametros/{chave}` |
+| Usuários | `/admin/usuarios` | admin | `GET/POST /usuarios`, `PATCH /usuarios/{id}` |
+| Programas e regras (CRUD) | `/admin/programas/...`, `/programas/:id` | admin | `POST/PUT/DELETE /programas`, `POST/PUT/DELETE /regras` |
+
+Todas as telas consomem a API; não há dados estáticos. Erros da API (validação, permissão, rede, sessão expirada) são
+exibidos ao usuário e as operações de sucesso geram avisos.
+
+### Organização do front-end
+
+```
+frontend/src/
+├── api/          # client.js (fetch + JWT + erros padronizados) e servicos.js (um objeto por recurso)
+├── contexts/     # AuthContext (sessão/JWT) e AlertasContext (avisos)
+├── hooks/        # useCarregar (estado de requisição)
+├── components/
+│   ├── ui/         # Botao, Campos, Alerta, Badge, Paginacao, ModalConfirmacao...
+│   ├── layout/     # Layout, Navbar, RotaProtegida
+│   ├── simulacao/  # CardPrograma, PerfilCalculado, ResultadoSimulacao
+│   ├── familias/   # FormularioFamilia, CamposMembro, FormularioMembro, TabelaMembros
+│   └── programas/  # FormularioPrograma, FormularioRegra, GerenciarRegras
+├── pages/        # uma página por rota (e pages/admin)
+└── utils/        # constantes e formatadores
 ```
 
-### Coleção Postman
+## Testes
 
-Já incluída em `docs/colecao-postman.json` (29 requisições, organizadas por tag). O request de login salva o token na variável `{{token}}` automaticamente — os demais já o utilizam.
-
-Para regerar após mudar endpoints:
-
-```bash
-python scripts/gerar_postman.py
+```powershell
+pytest -v                    # 48 testes da API (regras, perfis, permissões, usuários, CRUD)
+cd frontend; npm run build   # verifica a compilação do front
 ```
 
-## Endpoints
+O CI do GitHub (`.github/workflows/ci.yml`) executa os dois a cada push.
 
-### Autenticação
-| Método | Rota | Acesso |
-|---|---|---|
-| POST | `/api/v1/auth/registrar` | público |
-| POST | `/api/v1/auth/login` | público |
-| GET | `/api/v1/auth/me` | autenticado |
+## Documentação da API
 
-### Programas
-| Método | Rota | Acesso |
-|---|---|---|
-| GET | `/api/v1/programas` | público |
-| GET | `/api/v1/programas/{id}` | público |
-| GET | `/api/v1/programas/{id}/requisitos` | público |
-| POST | `/api/v1/programas` | admin |
-| PUT | `/api/v1/programas/{id}` | admin |
-| DELETE | `/api/v1/programas/{id}` | admin |
-| POST | `/api/v1/programas/{id}/regras` | admin |
-| DELETE | `/api/v1/regras/{id}` | admin |
+- Swagger UI: http://localhost:8000/docs · ReDoc: `/redoc` · OpenAPI: `/openapi.json`
+- Coleção Postman: `docs/colecao-postman.json` (33 requisições; o login salva o token em `{{token}}`).
+  Para regenerar após mudar endpoints: `python scripts/gerar_postman.py`.
 
-### Famílias
-| Método | Rota | Acesso |
-|---|---|---|
-| POST | `/api/v1/familias` | assistente_social, admin |
-| GET | `/api/v1/familias` | assistente_social, admin |
-| GET | `/api/v1/familias/{id}` | dono ou admin |
-| PUT | `/api/v1/familias/{id}` | dono ou admin |
-| DELETE | `/api/v1/familias/{id}` | admin |
-| POST | `/api/v1/familias/{id}/membros` | dono ou admin |
-| GET | `/api/v1/familias/{id}/membros` | dono ou admin |
-| PUT | `/api/v1/membros/{id}` | dono ou admin |
-| DELETE | `/api/v1/membros/{id}` | dono ou admin |
+### Papéis e permissões
 
-### Elegibilidade
-| Método | Rota | Acesso |
-|---|---|---|
-| POST | `/api/v1/elegibilidade/simular` | público |
-| POST | `/api/v1/familias/{id}/simulacoes` | dono ou admin |
-| GET | `/api/v1/familias/{id}/simulacoes` | dono ou admin |
-| GET | `/api/v1/simulacoes/{id}` | dono ou admin |
+| Recurso | Anônimo | Cidadão | Assistente social | Admin |
+|---|:--:|:--:|:--:|:--:|
+| Simular sem cadastro, ver catálogo e parâmetros | ✅ | ✅ | ✅ | ✅ |
+| Cadastrar, editar, simular e excluir **as próprias** famílias | — | ✅ | ✅ | ✅ (todas) |
+| Gerir programas, regras e parâmetros | — | — | — | ✅ |
+| Gerir usuários e ver relatórios | — | — | — | ✅ |
 
-### Gestão
-| Método | Rota | Acesso |
-|---|---|---|
-| GET | `/api/v1/parametros` | público |
-| PUT | `/api/v1/parametros/{chave}` | admin |
-| GET | `/api/v1/relatorios/cobertura` | admin |
-| GET | `/api/v1/relatorios/pendencias-frequentes` | admin |
-| GET | `/api/v1/health` | público |
-
-## Exemplo
-
-**Requisição**
-
-```bash
-curl -X POST http://localhost:8000/api/v1/elegibilidade/simular \
-  -H "Content-Type: application/json" \
-  -d '{
-    "municipio": "Salvador", "uf": "BA",
-    "renda_total_mensal": 800, "situacao_moradia": "alugada",
-    "possui_cadunico": true,
-    "membros": [
-      {"nome":"Maria","data_nascimento":"1990-03-12","parentesco":"responsavel","gestante":true},
-      {"nome":"Joana","data_nascimento":"2019-08-01","parentesco":"filho"},
-      {"nome":"Antônio","data_nascimento":"1955-01-20","parentesco":"pai","possui_deficiencia":true}
-    ]}'
-```
-
-**Resposta (trecho)**
-
-```json
-{
-  "perfil_calculado": {
-    "num_membros": 3, "renda_per_capita": 266.67,
-    "possui_gestante": true, "possui_idoso_65": true, "possui_pcd": true
-  },
-  "resumo": {"programas_avaliados": 4, "elegivel_em": 2, "quase_elegivel_em": 0},
-  "resultados": [
-    {"programa_nome": "Benefício de Prestação Continuada (BPC/LOAS)",
-     "elegivel": true, "percentual_atendimento": 100.0},
-    {"programa_nome": "Bolsa Família", "elegivel": false, "percentual_atendimento": 66.7,
-     "pendencias": [{
-        "codigo": "BF_RENDA",
-        "descricao": "Renda mensal por pessoa dentro da linha de pobreza",
-        "valor_informado": 266.67, "valor_exigido": 218.0,
-        "orientacao": "O valor informado está 48.67 acima do limite de 218.00."
-     }]}
-  ]
-}
-```
-
-## Formato de erro
-
-Toda falha responde no mesmo envelope:
+### Formato de erro
 
 ```json
 {"erro": {"codigo": "ACESSO_NEGADO", "mensagem": "Acesso restrito aos papéis: admin.", "detalhes": []}}
 ```
 
-## Observação sobre os valores dos programas
+## Valores de referência
 
-Os valores em `app/seed.py` foram conferidos em 22/09/2026 nas fontes oficiais: salário mínimo de R$ 1.621,00 (Decreto nº 12.797/2025, vigente desde 1º/jan/2026) e linha de pobreza do Bolsa Família de R$ 218,00 por pessoa (Lei 14.601/2023). O salário mínimo é reajustado todo mês de janeiro — vale reconferir antes de qualquer apresentação futura. Como as regras são dados, um reajuste é só atualizar o registro em `parametros`; nenhuma linha de código muda.
+Conferidos em 22/09/2026 nas fontes oficiais: salário mínimo de **R$ 1.621,00** (Decreto nº 12.797/2025, vigente desde
+1º/jan/2026) e linha de pobreza do Bolsa Família de **R$ 218,00** por pessoa (Lei 14.601/2023). O salário mínimo é
+reajustado todo janeiro: reconfira antes de apresentar e atualize em **Parâmetros** (sem alterar código).
 
-## Estrutura
+## Segurança e produção
 
-```
-app/
-├── main.py              # instância FastAPI, routers, metadados do Swagger
-├── config.py            # settings via .env
-├── database.py          # engine, sessão, Base
-├── core/
-│   ├── motor_regras.py  # motor de avaliação (puro, sem banco nem HTTP)
-│   ├── seguranca.py     # hash, JWT, papéis
-│   └── excecoes.py      # envelope de erro padronizado
-├── models/              # SQLAlchemy
-├── schemas/             # Pydantic (entrada/saída separados)
-├── services/            # perfil computado e orquestração da simulação
-├── routers/             # camada HTTP
-└── seed.py
-tests/                   # 40 testes
-scripts/gerar_postman.py
-docs/                    # openapi.json + coleção Postman
-```
+Para desenvolvimento, o CORS aceita qualquer origem. Em produção: restrinja `allow_origins`, troque `JWT_SECRET` e
+`SALT_IDENTIFICADOR` no `.env`, use PostgreSQL (`DATABASE_URL`), sirva por HTTPS e defina
+`VITE_MOSTRAR_CONTAS_DEMO=false`. O `Dockerfile` e o `docker-compose.yml` sobem API + PostgreSQL.
 
 ## Autor
 
