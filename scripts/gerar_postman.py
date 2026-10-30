@@ -20,10 +20,9 @@ SAIDA = RAIZ / "docs" / "colecao-postman.json"
 EXEMPLOS = {
     "/api/v1/auth/login": {"email": "admin@mapadodireito.org", "senha": "admin12345"},
     "/api/v1/auth/registrar": {
-        "nome": "Assistente Teste",
-        "email": "teste@exemplo.org",
+        "nome": "Maria Souza",
+        "email": "maria@exemplo.org",
         "senha": "senhaSegura123",
-        "papel": "assistente_social",
     },
     "/api/v1/elegibilidade/simular": {
         "municipio": "Salvador",
@@ -58,6 +57,14 @@ EXEMPLOS = {
             {"nome": "Lucas", "data_nascimento": "2012-06-05", "parentesco": "filho"},
         ],
     },
+    "/api/v1/usuarios": {
+        "nome": "Nova Assistente",
+        "email": "assistente@exemplo.org",
+        "senha": "senhaSegura123",
+        "papel": "assistente_social",
+    },
+    "/api/v1/usuarios/{usuario_id}": {"papel": "assistente_social", "ativo": True},
+    "/api/v1/regras/{regra_id}": {"valor": "250", "obrigatoria": True},
     "/api/v1/parametros/{chave}": {
         "valor": 1621.0,
         "descricao": "Salário mínimo vigente",

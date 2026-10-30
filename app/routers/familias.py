@@ -28,7 +28,7 @@ from app.services.perfil import calcular_idade, montar_perfil
 router = APIRouter(prefix="/api/v1", tags=["Famílias"])
 
 DB = Annotated[Session, Depends(get_db)]
-Cadastrador = Depends(exigir_papel("admin", "assistente_social"))
+Cadastrador = Depends(exigir_papel("admin", "assistente_social", "cidadao"))
 
 
 def montar_resposta_familia(familia: Familia) -> FamiliaResposta:
@@ -141,8 +141,8 @@ def atualizar_familia(familia_id: int, dados: FamiliaAtualizar, db: DB, usuario:
 @router.delete(
     "/familias/{familia_id}",
     status_code=status.HTTP_204_NO_CONTENT,
-    summary="Exclui a família e todo o seu histórico (admin)",
-    dependencies=[Depends(exigir_papel("admin"))],
+    summary="Exclui a família e todo o seu histórico",
+    description="Permitido ao responsável pelo cadastro ou a um administrador.",
     responses={**ERROS_PADRAO},
 )
 def excluir_familia(familia_id: int, db: DB, usuario: UsuarioAtual):

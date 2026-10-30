@@ -13,6 +13,7 @@ from app.schemas.programa import (
     ProgramaCriar,
     ProgramaResposta,
     ProgramaResumo,
+    RegraAtualizar,
     RegraCriar,
     RegraResposta,
     RequisitoLegivel,
@@ -165,6 +166,25 @@ def adicionar_regra(programa_id: int, dados: RegraCriar, db: DB):
     programa = buscar_programa(db, programa_id)
     regra = Regra(programa_id=programa.id, **dados.model_dump())
     db.add(regra)
+    db.commit()
+    db.refresh(regra)
+    return regra
+
+
+@router.put(
+    "/regras/{regra_id}",
+    response_model=RegraResposta,
+    summary="Atualiza uma regra de elegibilidade (admin)",
+    description="Atualização parcial: apenas os campos enviados são alterados.",
+    dependencies=[SomenteAdmin],
+    responses={**ERROS_PADRAO},
+)
+def atualizar_regra(regra_id: int, dados: RegraAtualizar, db: DB):
+    regra = db.get(Regra, regra_id)
+    if not regra:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Regra não encontrada.")
+    for campo, valor in dados.model_dump(exclude_unset=True).items():
+        setattr(regra, campo, valor)
     db.commit()
     db.refresh(regra)
     return regra

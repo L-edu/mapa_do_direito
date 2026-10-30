@@ -13,7 +13,7 @@ from app.config import settings
 from app.core.excecoes import registrar_handlers
 from app.database import Base, engine
 from app.models import *  # noqa: F401,F403  (garante o registro das tabelas no metadata)
-from app.routers import auth, elegibilidade, familias, gestao, programas
+from app.routers import auth, elegibilidade, familias, gestao, programas, usuarios
 
 DESCRICAO = """
 API que identifica a quais programas de transferência de renda e benefícios sociais
@@ -34,9 +34,9 @@ novo ou reajustar um limite de renda sem alterar uma linha de código.
 ### Papéis
 | Papel | Permissões |
 |---|---|
-| `cidadao` | Simulação anônima e consulta ao catálogo |
-| `assistente_social` | Cadastro de famílias e simulações com histórico |
-| `admin` | Gestão de programas, regras, parâmetros e relatórios |
+| `cidadao` | Simulação, cadastro e histórico da própria família |
+| `assistente_social` | Cadastro de famílias atendidas e simulações com histórico |
+| `admin` | Gestão de programas, regras, parâmetros, usuários e relatórios |
 
 ### Privacidade
 Em conformidade com a LGPD, a API **não recebe nem armazena CPF, NIS ou qualquer
@@ -63,6 +63,7 @@ app = FastAPI(
         {"name": "Famílias", "description": "Cadastro socioeconômico e composição familiar."},
         {"name": "Gestão", "description": "Parâmetros de referência e relatórios agregados."},
         {"name": "Autenticação", "description": "Registro, login e emissão de token JWT."},
+        {"name": "Usuários", "description": "Gestão de contas e papéis (admin)."},
         {"name": "Infraestrutura", "description": "Healthcheck."},
     ],
 )
@@ -77,7 +78,7 @@ app.add_middleware(
 
 registrar_handlers(app)
 
-for modulo in (auth, programas, familias, elegibilidade, gestao):
+for modulo in (auth, usuarios, programas, familias, elegibilidade, gestao):
     app.include_router(modulo.router)
 
 

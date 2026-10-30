@@ -27,6 +27,19 @@ class RegraCriar(RegraBase):
     pass
 
 
+class RegraAtualizar(BaseModel):
+    codigo: str | None = Field(None, max_length=60)
+    descricao: str | None = Field(None, max_length=255)
+    campo: str | None = Field(None, max_length=60)
+    operador: Operador | None = None
+    valor: str | None = None
+    tipo_valor: TipoValor | None = None
+    obrigatoria: bool | None = None
+    grupo_logico: str | None = None
+    orientacao: str | None = None
+    ordem: int | None = None
+
+
 class RegraResposta(RegraBase):
     model_config = ConfigDict(from_attributes=True)
 

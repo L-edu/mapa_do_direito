@@ -1,7 +1,7 @@
 {
   "info": {
     "name": "Mapa do Direito — API de elegibilidade (ODS 1)",
-    "description": "\nAPI que identifica a quais programas de transferência de renda e benefícios sociais\numa família tem direito, e — quando ainda não tem — **exatamente o que falta** para\nse enquadrar.\n\n### Problema\nParte significativa das famílias em situação de vulnerabilidade não acessa benefícios\naos quais já teria direito, por desconhecimento dos critérios ou por pendências\ncadastrais simples. O caminho inverso também ocorre: pessoas tentam o benefício,\nsão negadas e não recebem orientação sobre o motivo.\n\n### Como funciona\nAs regras de elegibilidade **não estão codificadas em `if/else`**: ficam no banco como\ndados declarativos (`campo` + `operador` + `valor`). Isso permite cadastrar um programa\nnovo ou reajustar um limite de renda sem alterar uma linha de código.\n\n### Papéis\n| Papel | Permissões |\n|---|---|\n| `cidadao` | Simulação anônima e consulta ao catálogo |\n| `assistente_social` | Cadastro de famílias e simulações com histórico |\n| `admin` | Gestão de programas, regras, parâmetros e relatórios |\n\n### Privacidade\nEm conformidade com a LGPD, a API **não recebe nem armazena CPF, NIS ou qualquer\nidentificador direto**. Cada família recebe um código interno opaco.\n",
+    "description": "\nAPI que identifica a quais programas de transferência de renda e benefícios sociais\numa família tem direito, e — quando ainda não tem — **exatamente o que falta** para\nse enquadrar.\n\n### Problema\nParte significativa das famílias em situação de vulnerabilidade não acessa benefícios\naos quais já teria direito, por desconhecimento dos critérios ou por pendências\ncadastrais simples. O caminho inverso também ocorre: pessoas tentam o benefício,\nsão negadas e não recebem orientação sobre o motivo.\n\n### Como funciona\nAs regras de elegibilidade **não estão codificadas em `if/else`**: ficam no banco como\ndados declarativos (`campo` + `operador` + `valor`). Isso permite cadastrar um programa\nnovo ou reajustar um limite de renda sem alterar uma linha de código.\n\n### Papéis\n| Papel | Permissões |\n|---|---|\n| `cidadao` | Simulação, cadastro e histórico da própria família |\n| `assistente_social` | Cadastro de famílias atendidas e simulações com histórico |\n| `admin` | Gestão de programas, regras, parâmetros, usuários e relatórios |\n\n### Privacidade\nEm conformidade com a LGPD, a API **não recebe nem armazena CPF, NIS ou qualquer\nidentificador direto**. Cada família recebe um código interno opaco.\n",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
@@ -44,10 +44,10 @@
                 "registrar"
               ]
             },
-            "description": "Cadastro público. O papel `admin` é ignorado neste endpoint: contas administrativas são criadas pelo seed ou promovidas por outro administrador.",
+            "description": "Cadastro público. A conta nasce sempre com o papel `cidadao`; contas de assistente social e administrador são criadas por um administrador em `/usuarios`.",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"nome\": \"Assistente Teste\",\n  \"email\": \"teste@exemplo.org\",\n  \"senha\": \"senhaSegura123\",\n  \"papel\": \"assistente_social\"\n}",
+              "raw": "{\n  \"nome\": \"Maria Souza\",\n  \"email\": \"maria@exemplo.org\",\n  \"senha\": \"senhaSegura123\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -136,6 +136,114 @@
               ]
             },
             "description": ""
+          }
+        }
+      ]
+    },
+    {
+      "name": "Usuários",
+      "item": [
+        {
+          "name": "Lista usuários (admin)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/usuarios",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "usuarios"
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Cria uma conta com qualquer papel (admin)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/usuarios",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "usuarios"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nome\": \"Nova Assistente\",\n  \"email\": \"assistente@exemplo.org\",\n  \"senha\": \"senhaSegura123\",\n  \"papel\": \"assistente_social\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Atualiza papel, situação, nome ou senha (admin)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/usuarios/{usuario_id}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "usuarios",
+                "{usuario_id}"
+              ]
+            },
+            "description": "Atualização parcial. Um administrador não pode rebaixar nem desativar a própria conta.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"papel\": \"assistente_social\",\n  \"ativo\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
           }
         }
       ]
@@ -374,6 +482,44 @@
           }
         },
         {
+          "name": "Atualiza uma regra de elegibilidade (admin)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/regras/{regra_id}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "regras",
+                "{regra_id}"
+              ]
+            },
+            "description": "Atualização parcial: apenas os campos enviados são alterados.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"valor\": \"250\",\n  \"obrigatoria\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
           "name": "Remove uma regra (admin)",
           "request": {
             "method": "DELETE",
@@ -540,7 +686,7 @@
           }
         },
         {
-          "name": "Exclui a família e todo o seu histórico (admin)",
+          "name": "Exclui a família e todo o seu histórico",
           "request": {
             "method": "DELETE",
             "header": [
@@ -565,7 +711,7 @@
                 "{familia_id}"
               ]
             },
-            "description": ""
+            "description": "Permitido ao responsável pelo cadastro ou a um administrador."
           }
         },
         {

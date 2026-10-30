@@ -81,3 +81,8 @@ def auth_admin(client):
 @pytest.fixture
 def auth_assistente(client):
     return _token(client, "cras@mapadodireito.org", "cras12345")
+
+
+@pytest.fixture
+def auth_cidadao(client):
+    return _token(client, "cidadao@mapadodireito.org", "cidadao12345")

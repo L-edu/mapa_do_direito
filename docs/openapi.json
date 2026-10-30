@@ -1,1 +1,4598 @@
-{"openapi":"3.1.0","info":{"title":"Mapa do Direito","description":"\nAPI que identifica a quais programas de transferência de renda e benefícios sociais\numa família tem direito, e — quando ainda não tem — **exatamente o que falta** para\nse enquadrar.\n\n### Problema\nParte significativa das famílias em situação de vulnerabilidade não acessa benefícios\naos quais já teria direito, por desconhecimento dos critérios ou por pendências\ncadastrais simples. O caminho inverso também ocorre: pessoas tentam o benefício,\nsão negadas e não recebem orientação sobre o motivo.\n\n### Como funciona\nAs regras de elegibilidade **não estão codificadas em `if/else`**: ficam no banco como\ndados declarativos (`campo` + `operador` + `valor`). Isso permite cadastrar um programa\nnovo ou reajustar um limite de renda sem alterar uma linha de código.\n\n### Papéis\n| Papel | Permissões |\n|---|---|\n| `cidadao` | Simulação anônima e consulta ao catálogo |\n| `assistente_social` | Cadastro de famílias e simulações com histórico |\n| `admin` | Gestão de programas, regras, parâmetros e relatórios |\n\n### Privacidade\nEm conformidade com a LGPD, a API **não recebe nem armazena CPF, NIS ou qualquer\nidentificador direto**. Cada família recebe um código interno opaco.\n","contact":{"name":"Luiz Eduardo Reis Souza","email":"luiz.e.souzadev@gmail.com"},"license":{"name":"MIT"},"version":"1.0.0"},"paths":{"/api/v1/auth/registrar":{"post":{"tags":["Autenticação"],"summary":"Cria uma nova conta","description":"Cadastro público. O papel `admin` é ignorado neste endpoint: contas administrativas são criadas pelo seed ou promovidas por outro administrador.","operationId":"registrar_api_v1_auth_registrar_post","requestBody":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/UsuarioCriar"}}},"required":true},"responses":{"201":{"description":"Successful Response","content":{"application/json":{"schema":{"$ref":"#/components/schemas/UsuarioResposta"}}}},"422":{"description":"Validation Error","content":{"application/json":{"schema":{"$ref":"#/components/schemas/HTTPValidationError"}}}}}}},"/api/v1/auth/login":{"post":{"tags":["Autenticação"],"summary":"Autentica e devolve o token JWT","operationId":"login_api_v1_auth_login_post","requestBody":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/LoginRequisicao"}}},"required":true},"responses":{"200":{"description":"Successful Response","content":{"application/json":{"schema":{"$ref":"#/components/schemas/TokenResposta"}}}},"401":{"description":"Token ausente ou inválido","content":{"application/json":{"schema":{"$ref":"#/components/schemas/RespostaErro"}}}},"422":{"description":"Validation Error","content":{"application/json":{"schema":{"$ref":"#/components/schemas/HTTPValidationError"}}}}}}},"/api/v1/auth/me":{"get":{"tags":["Autenticação"],"summary":"Dados do usuário autenticado","operationId":"eu_api_v1_auth_me_get","responses":{"200":{"description":"Successful Response","content":{"application/json":{"schema":{"$ref":"#/components/schemas/UsuarioResposta"}}}},"401":{"description":"Token ausente ou inválido","content":{"application/json":{"schema":{"$ref":"#/components/schemas/RespostaErro"}}}}},"security":[{"OAuth2PasswordBearer":[]}]}},"/api/v1/programas":{"get":{"tags":["Programas"],"summary":"Lista os programas do catálogo","description":"Endpoint público e paginado. Aceita filtros por esfera, situação e texto livre.","operationId":"listar_programas_api_v1_programas_get","parameters":[{"name":"esfera","in":"query","required":false,"schema":{"anyOf":[{"type":"string"},{"type":"null"}],"description":"federal, estadual ou municipal","title":"Esfera"},"description":"federal, estadual ou municipal"},{"name":"ativo","in":"query","required":false,"schema":{"anyOf":[{"type":"boolean"},{"type":"null"}],"title":"Ativo"}},{"name":"busca","in":"query","required":false,"schema":{"anyOf":[{"type":"string"},{"type":"null"}],"description":"Busca por nome ou órgão responsável.","title":"Busca"},"description":"Busca por nome ou órgão responsável."},{"name":"pagina","in":"query","required":false,"schema":{"type":"integer","minimum":1,"description":"Página desejada, começando em 1.","default":1,"title":"Pagina"},"description":"Página desejada, começando em 1."},{"name":"tamanho","in":"query","required":false,"schema":{"type":"integer","maximum":100,"minimum":1,"description":"Itens por página (máx. 100).","default":20,"title":"Tamanho"},"description":"Itens por página (máx. 100)."}],"responses":{"200":{"description":"Successful Response","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Pagina_ProgramaResumo_"}}}},"422":{"description":"Validation Error","content":{"application/json":{"schema":{"$ref":"#/components/schemas/HTTPValidationError"}}}}}},"post":{"tags":["Programas"],"summary":"Cadastra um programa (admin)","operationId":"criar_programa_api_v1_programas_post","security":[{"OAuth2PasswordBearer":[]}],"requestBody":{"required":true,"content":{"application/json":{"schema":{"$ref":"#/components/schemas/ProgramaCriar"}}}},"responses":{"201":{"description":"Successful Response","content":{"application/json":{"schema":{"$ref":"#/components/schemas/ProgramaResposta"}}}},"401":{"description":"Token ausente ou inválido","content":{"application/json":{"schema":{"$ref":"#/components/schemas/RespostaErro"}}}},"403":{"description":"Papel sem permissão para a operação","content":{"application/json":{"schema":{"$ref":"#/components/schemas/RespostaErro"}}}},"422":{"description":"Validation Error","content":{"application/json":{"schema":{"$ref":"#/components/schemas/HTTPValidationError"}}}}}}},"/api/v1/programas/{programa_id}":{"get":{"tags":["Programas"],"summary":"Detalha um programa e suas regras","operationId":"detalhar_programa_api_v1_programas__programa_id__get","parameters":[{"name":"programa_id","in":"path","required":true,"schema":{"type":"integer","title":"Programa Id"}}],"responses":{"200":{"description":"Successful Response","content":{"application/json":{"schema":{"$ref":"#/components/schemas/ProgramaResposta"}}}},"404":{"description":"Recurso não encontrado","content":{"application/json":{"schema":{"$ref":"#/components/schemas/RespostaErro"}}}},"422":{"description":"Validation Error","content":{"application/json":{"schema":{"$ref":"#/components/schemas/HTTPValidationError"}}}}}},"put":{"tags":["Programas"],"summary":"Atualiza um programa (admin)","operationId":"atualizar_programa_api_v1_programas__programa_id__put","security":[{"OAuth2PasswordBearer":[]}],"parameters":[{"name":"programa_id","in":"path","required":true,"schema":{"type":"integer","title":"Programa Id"}}],"requestBody":{"required":true,"content":{"application/json":{"schema":{"$ref":"#/components/schemas/ProgramaAtualizar"}}}},"responses":{"200":{"description":"Successful Response","content":{"application/json":{"schema":{"$ref":"#/components/schemas/ProgramaResposta"}}}},"401":{"description":"Token ausente ou inválido","content":{"application/json":{"schema":{"$ref":"#/components/schemas/RespostaErro"}}}},"403":{"description":"Papel sem permissão para a operação","content":{"application/json":{"schema":{"$ref":"#/components/schemas/RespostaErro"}}}},"404":{"description":"Recurso não encontrado","content":{"application/json":{"schema":{"$ref":"#/components/schemas/RespostaErro"}}}},"422":{"description":"Validation Error","content":{"application/json":{"schema":{"$ref":"#/components/schemas/HTTPValidationError"}}}}}},"delete":{"tags":["Programas"],"summary":"Desativa um programa (admin)","description":"Exclusão lógica: o histórico de simulações continua íntegro.","operationId":"desativar_programa_api_v1_programas__programa_id__delete","security":[{"OAuth2PasswordBearer":[]}],"parameters":[{"name":"programa_id","in":"path","required":true,"schema":{"type":"integer","title":"Programa Id"}}],"responses":{"204":{"description":"Successful Response"},"401":{"description":"Token ausente ou inválido","content":{"application/json":{"schema":{"$ref":"#/components/schemas/RespostaErro"}}}},"403":{"description":"Papel sem permissão para a operação","content":{"application/json":{"schema":{"$ref":"#/components/schemas/RespostaErro"}}}},"404":{"description":"Recurso não encontrado","content":{"application/json":{"schema":{"$ref":"#/components/schemas/RespostaErro"}}}},"422":{"description":"Validation Error","content":{"application/json":{"schema":{"$ref":"#/components/schemas/HTTPValidationError"}}}}}}},"/api/v1/programas/{programa_id}/requisitos":{"get":{"tags":["Programas"],"summary":"Requisitos em linguagem simples","description":"Traduz as regras declarativas para frases legíveis por qualquer cidadão.","operationId":"requisitos_api_v1_programas__programa_id__requisitos_get","parameters":[{"name":"programa_id","in":"path","required":true,"schema":{"type":"integer","title":"Programa Id"}}],"responses":{"200":{"description":"Successful Response","content":{"application/json":{"schema":{"type":"array","items":{"$ref":"#/components/schemas/RequisitoLegivel"},"title":"Response Requisitos Api V1 Programas  Programa Id  Requisitos Get"}}}},"404":{"description":"Recurso não encontrado","content":{"application/json":{"schema":{"$ref":"#/components/schemas/RespostaErro"}}}},"422":{"description":"Validation Error","content":{"application/json":{"schema":{"$ref":"#/components/schemas/HTTPValidationError"}}}}}}},"/api/v1/programas/{programa_id}/regras":{"post":{"tags":["Programas"],"summary":"Adiciona uma regra de elegibilidade (admin)","operationId":"adicionar_regra_api_v1_programas__programa_id__regras_post","security":[{"OAuth2PasswordBearer":[]}],"parameters":[{"name":"programa_id","in":"path","required":true,"schema":{"type":"integer","title":"Programa Id"}}],"requestBody":{"required":true,"content":{"application/json":{"schema":{"$ref":"#/components/schemas/RegraCriar"}}}},"responses":{"201":{"description":"Successful Response","content":{"application/json":{"schema":{"$ref":"#/components/schemas/RegraResposta"}}}},"401":{"description":"Token ausente ou inválido","content":{"application/json":{"schema":{"$ref":"#/components/schemas/RespostaErro"}}}},"403":{"description":"Papel sem permissão para a operação","content":{"application/json":{"schema":{"$ref":"#/components/schemas/RespostaErro"}}}},"404":{"description":"Recurso não encontrado","content":{"application/json":{"schema":{"$ref":"#/components/schemas/RespostaErro"}}}},"422":{"description":"Validation Error","content":{"application/json":{"schema":{"$ref":"#/components/schemas/HTTPValidationError"}}}}}}},"/api/v1/regras/{regra_id}":{"delete":{"tags":["Programas"],"summary":"Remove uma regra (admin)","operationId":"remover_regra_api_v1_regras__regra_id__delete","security":[{"OAuth2PasswordBearer":[]}],"parameters":[{"name":"regra_id","in":"path","required":true,"schema":{"type":"integer","title":"Regra Id"}}],"responses":{"204":{"description":"Successful Response"},"401":{"description":"Token ausente ou inválido","content":{"application/json":{"schema":{"$ref":"#/components/schemas/RespostaErro"}}}},"403":{"description":"Papel sem permissão para a operação","content":{"application/json":{"schema":{"$ref":"#/components/schemas/RespostaErro"}}}},"404":{"description":"Recurso não encontrado","content":{"application/json":{"schema":{"$ref":"#/components/schemas/RespostaErro"}}}},"422":{"description":"Validation Error","content":{"application/json":{"schema":{"$ref":"#/components/schemas/HTTPValidationError"}}}}}}},"/api/v1/familias":{"post":{"tags":["Famílias"],"summary":"Cadastra uma família","description":"Disponível para assistentes sociais e administradores. Por conformidade com a LGPD, a API não recebe CPF, NIS ou qualquer identificador direto: a família recebe um código interno opaco.","operationId":"criar_familia_api_v1_familias_post","security":[{"OAuth2PasswordBearer":[]}],"requestBody":{"required":true,"content":{"application/json":{"schema":{"$ref":"#/components/schemas/FamiliaCriar"}}}},"responses":{"201":{"description":"Successful Response","content":{"application/json":{"schema":{"$ref":"#/components/schemas/FamiliaResposta"}}}},"401":{"description":"Token ausente ou inválido","content":{"application/json":{"schema":{"$ref":"#/components/schemas/RespostaErro"}}}},"403":{"description":"Papel sem permissão para a operação","content":{"application/json":{"schema":{"$ref":"#/components/schemas/RespostaErro"}}}},"422":{"description":"Validation Error","content":{"application/json":{"schema":{"$ref":"#/components/schemas/HTTPValidationError"}}}}}},"get":{"tags":["Famílias"],"summary":"Lista famílias cadastradas","description":"Administradores veem todas; assistentes sociais veem apenas os próprios cadastros.","operationId":"listar_familias_api_v1_familias_get","security":[{"OAuth2PasswordBearer":[]}],"parameters":[{"name":"municipio","in":"query","required":false,"schema":{"anyOf":[{"type":"string"},{"type":"null"}],"title":"Municipio"}},{"name":"uf","in":"query","required":false,"schema":{"anyOf":[{"type":"string","minLength":2,"maxLength":2},{"type":"null"}],"title":"Uf"}},{"name":"possui_cadunico","in":"query","required":false,"schema":{"anyOf":[{"type":"boolean"},{"type":"null"}],"title":"Possui Cadunico"}},{"name":"pagina","in":"query","required":false,"schema":{"type":"integer","minimum":1,"description":"Página desejada, começando em 1.","default":1,"title":"Pagina"},"description":"Página desejada, começando em 1."},{"name":"tamanho","in":"query","required":false,"schema":{"type":"integer","maximum":100,"minimum":1,"description":"Itens por página (máx. 100).","default":20,"title":"Tamanho"},"description":"Itens por página (máx. 100)."}],"responses":{"200":{"description":"Successful Response","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Pagina_FamiliaResumo_"}}}},"401":{"description":"Token ausente ou inválido","content":{"application/json":{"schema":{"$ref":"#/components/schemas/RespostaErro"}}}},"403":{"description":"Papel sem permissão para a operação","content":{"application/json":{"schema":{"$ref":"#/components/schemas/RespostaErro"}}}},"422":{"description":"Validation Error","content":{"application/json":{"schema":{"$ref":"#/components/schemas/HTTPValidationError"}}}}}}},"/api/v1/familias/{familia_id}":{"get":{"tags":["Famílias"],"summary":"Detalha uma família com o perfil calculado","operationId":"detalhar_familia_api_v1_familias__familia_id__get","security":[{"OAuth2PasswordBearer":[]}],"parameters":[{"name":"familia_id","in":"path","required":true,"schema":{"type":"integer","title":"Familia Id"}}],"responses":{"200":{"description":"Successful Response","content":{"application/json":{"schema":{"$ref":"#/components/schemas/FamiliaResposta"}}}},"401":{"description":"Token ausente ou inválido","content":{"application/json":{"schema":{"$ref":"#/components/schemas/RespostaErro"}}}},"403":{"description":"Papel sem permissão para a operação","content":{"application/json":{"schema":{"$ref":"#/components/schemas/RespostaErro"}}}},"404":{"description":"Recurso não encontrado","content":{"application/json":{"schema":{"$ref":"#/components/schemas/RespostaErro"}}}},"422":{"description":"Validation Error","content":{"application/json":{"schema":{"$ref":"#/components/schemas/HTTPValidationError"}}}}}},"put":{"tags":["Famílias"],"summary":"Atualiza os dados da família","operationId":"atualizar_familia_api_v1_familias__familia_id__put","security":[{"OAuth2PasswordBearer":[]}],"parameters":[{"name":"familia_id","in":"path","required":true,"schema":{"type":"integer","title":"Familia Id"}}],"requestBody":{"required":true,"content":{"application/json":{"schema":{"$ref":"#/components/schemas/FamiliaAtualizar"}}}},"responses":{"200":{"description":"Successful Response","content":{"application/json":{"schema":{"$ref":"#/components/schemas/FamiliaResposta"}}}},"401":{"description":"Token ausente ou inválido","content":{"application/json":{"schema":{"$ref":"#/components/schemas/RespostaErro"}}}},"403":{"description":"Papel sem permissão para a operação","content":{"application/json":{"schema":{"$ref":"#/components/schemas/RespostaErro"}}}},"404":{"description":"Recurso não encontrado","content":{"application/json":{"schema":{"$ref":"#/components/schemas/RespostaErro"}}}},"422":{"description":"Validation Error","content":{"application/json":{"schema":{"$ref":"#/components/schemas/HTTPValidationError"}}}}}},"delete":{"tags":["Famílias"],"summary":"Exclui a família e todo o seu histórico (admin)","operationId":"excluir_familia_api_v1_familias__familia_id__delete","security":[{"OAuth2PasswordBearer":[]}],"parameters":[{"name":"familia_id","in":"path","required":true,"schema":{"type":"integer","title":"Familia Id"}}],"responses":{"204":{"description":"Successful Response"},"401":{"description":"Token ausente ou inválido","content":{"application/json":{"schema":{"$ref":"#/components/schemas/RespostaErro"}}}},"403":{"description":"Papel sem permissão para a operação","content":{"application/json":{"schema":{"$ref":"#/components/schemas/RespostaErro"}}}},"404":{"description":"Recurso não encontrado","content":{"application/json":{"schema":{"$ref":"#/components/schemas/RespostaErro"}}}},"422":{"description":"Validation Error","content":{"application/json":{"schema":{"$ref":"#/components/schemas/HTTPValidationError"}}}}}}},"/api/v1/familias/{familia_id}/membros":{"post":{"tags":["Famílias"],"summary":"Adiciona um membro à família","operationId":"adicionar_membro_api_v1_familias__familia_id__membros_post","security":[{"OAuth2PasswordBearer":[]}],"parameters":[{"name":"familia_id","in":"path","required":true,"schema":{"type":"integer","title":"Familia Id"}}],"requestBody":{"required":true,"content":{"application/json":{"schema":{"$ref":"#/components/schemas/MembroCriar"}}}},"responses":{"201":{"description":"Successful Response","content":{"application/json":{"schema":{"$ref":"#/components/schemas/MembroResposta"}}}},"401":{"description":"Token ausente ou inválido","content":{"application/json":{"schema":{"$ref":"#/components/schemas/RespostaErro"}}}},"403":{"description":"Papel sem permissão para a operação","content":{"application/json":{"schema":{"$ref":"#/components/schemas/RespostaErro"}}}},"404":{"description":"Recurso não encontrado","content":{"application/json":{"schema":{"$ref":"#/components/schemas/RespostaErro"}}}},"422":{"description":"Validation Error","content":{"application/json":{"schema":{"$ref":"#/components/schemas/HTTPValidationError"}}}}}},"get":{"tags":["Famílias"],"summary":"Lista os membros da família","operationId":"listar_membros_api_v1_familias__familia_id__membros_get","security":[{"OAuth2PasswordBearer":[]}],"parameters":[{"name":"familia_id","in":"path","required":true,"schema":{"type":"integer","title":"Familia Id"}}],"responses":{"200":{"description":"Successful Response","content":{"application/json":{"schema":{"type":"array","items":{"$ref":"#/components/schemas/MembroResposta"},"title":"Response Listar Membros Api V1 Familias  Familia Id  Membros Get"}}}},"401":{"description":"Token ausente ou inválido","content":{"application/json":{"schema":{"$ref":"#/components/schemas/RespostaErro"}}}},"403":{"description":"Papel sem permissão para a operação","content":{"application/json":{"schema":{"$ref":"#/components/schemas/RespostaErro"}}}},"404":{"description":"Recurso não encontrado","content":{"application/json":{"schema":{"$ref":"#/components/schemas/RespostaErro"}}}},"422":{"description":"Validation Error","content":{"application/json":{"schema":{"$ref":"#/components/schemas/HTTPValidationError"}}}}}}},"/api/v1/membros/{membro_id}":{"put":{"tags":["Famílias"],"summary":"Atualiza um membro","operationId":"atualizar_membro_api_v1_membros__membro_id__put","security":[{"OAuth2PasswordBearer":[]}],"parameters":[{"name":"membro_id","in":"path","required":true,"schema":{"type":"integer","title":"Membro Id"}}],"requestBody":{"required":true,"content":{"application/json":{"schema":{"$ref":"#/components/schemas/MembroAtualizar"}}}},"responses":{"200":{"description":"Successful Response","content":{"application/json":{"schema":{"$ref":"#/components/schemas/MembroResposta"}}}},"401":{"description":"Token ausente ou inválido","content":{"application/json":{"schema":{"$ref":"#/components/schemas/RespostaErro"}}}},"403":{"description":"Papel sem permissão para a operação","content":{"application/json":{"schema":{"$ref":"#/components/schemas/RespostaErro"}}}},"404":{"description":"Recurso não encontrado","content":{"application/json":{"schema":{"$ref":"#/components/schemas/RespostaErro"}}}},"422":{"description":"Validation Error","content":{"application/json":{"schema":{"$ref":"#/components/schemas/HTTPValidationError"}}}}}},"delete":{"tags":["Famílias"],"summary":"Remove um membro","operationId":"remover_membro_api_v1_membros__membro_id__delete","security":[{"OAuth2PasswordBearer":[]}],"parameters":[{"name":"membro_id","in":"path","required":true,"schema":{"type":"integer","title":"Membro Id"}}],"responses":{"204":{"description":"Successful Response"},"401":{"description":"Token ausente ou inválido","content":{"application/json":{"schema":{"$ref":"#/components/schemas/RespostaErro"}}}},"403":{"description":"Papel sem permissão para a operação","content":{"application/json":{"schema":{"$ref":"#/components/schemas/RespostaErro"}}}},"404":{"description":"Recurso não encontrado","content":{"application/json":{"schema":{"$ref":"#/components/schemas/RespostaErro"}}}},"422":{"description":"Validation Error","content":{"application/json":{"schema":{"$ref":"#/components/schemas/HTTPValidationError"}}}}}}},"/api/v1/elegibilidade/simular":{"post":{"tags":["Elegibilidade"],"summary":"Simula a elegibilidade sem cadastro (público)","description":"Avalia o perfil informado contra todos os programas ativos e devolve, para cada um, se a família é elegível, quais requisitos já são atendidos e, quando não é elegível, exatamente o que falta. Nenhum dado é gravado.","operationId":"simular_anonimo_api_v1_elegibilidade_simular_post","requestBody":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/SimulacaoAnonima"}}},"required":true},"responses":{"200":{"description":"Successful Response","content":{"application/json":{"schema":{"$ref":"#/components/schemas/SimulacaoResposta"}}}},"422":{"description":"Validation Error","content":{"application/json":{"schema":{"$ref":"#/components/schemas/HTTPValidationError"}}}}}}},"/api/v1/familias/{familia_id}/simulacoes":{"post":{"tags":["Elegibilidade"],"summary":"Simula e registra o resultado no histórico da família","operationId":"simular_familia_api_v1_familias__familia_id__simulacoes_post","security":[{"OAuth2PasswordBearer":[]}],"parameters":[{"name":"familia_id","in":"path","required":true,"schema":{"type":"integer","title":"Familia Id"}}],"responses":{"201":{"description":"Successful Response","content":{"application/json":{"schema":{"$ref":"#/components/schemas/SimulacaoResposta"}}}},"401":{"description":"Token ausente ou inválido","content":{"application/json":{"schema":{"$ref":"#/components/schemas/RespostaErro"}}}},"403":{"description":"Papel sem permissão para a operação","content":{"application/json":{"schema":{"$ref":"#/components/schemas/RespostaErro"}}}},"404":{"description":"Recurso não encontrado","content":{"application/json":{"schema":{"$ref":"#/components/schemas/RespostaErro"}}}},"422":{"description":"Validation Error","content":{"application/json":{"schema":{"$ref":"#/components/schemas/HTTPValidationError"}}}}}},"get":{"tags":["Elegibilidade"],"summary":"Histórico de simulações da família","operationId":"listar_simulacoes_api_v1_familias__familia_id__simulacoes_get","security":[{"OAuth2PasswordBearer":[]}],"parameters":[{"name":"familia_id","in":"path","required":true,"schema":{"type":"integer","title":"Familia Id"}},{"name":"pagina","in":"query","required":false,"schema":{"type":"integer","minimum":1,"description":"Página desejada, começando em 1.","default":1,"title":"Pagina"},"description":"Página desejada, começando em 1."},{"name":"tamanho","in":"query","required":false,"schema":{"type":"integer","maximum":100,"minimum":1,"description":"Itens por página (máx. 100).","default":20,"title":"Tamanho"},"description":"Itens por página (máx. 100)."}],"responses":{"200":{"description":"Successful Response","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Pagina_SimulacaoResumo_"}}}},"401":{"description":"Token ausente ou inválido","content":{"application/json":{"schema":{"$ref":"#/components/schemas/RespostaErro"}}}},"403":{"description":"Papel sem permissão para a operação","content":{"application/json":{"schema":{"$ref":"#/components/schemas/RespostaErro"}}}},"404":{"description":"Recurso não encontrado","content":{"application/json":{"schema":{"$ref":"#/components/schemas/RespostaErro"}}}},"422":{"description":"Validation Error","content":{"application/json":{"schema":{"$ref":"#/components/schemas/HTTPValidationError"}}}}}}},"/api/v1/simulacoes/{simulacao_id}":{"get":{"tags":["Elegibilidade"],"summary":"Resultado detalhado de uma simulação","operationId":"detalhar_simulacao_api_v1_simulacoes__simulacao_id__get","security":[{"OAuth2PasswordBearer":[]}],"parameters":[{"name":"simulacao_id","in":"path","required":true,"schema":{"type":"integer","title":"Simulacao Id"}}],"responses":{"200":{"description":"Successful Response","content":{"application/json":{"schema":{"$ref":"#/components/schemas/SimulacaoResposta"}}}},"401":{"description":"Token ausente ou inválido","content":{"application/json":{"schema":{"$ref":"#/components/schemas/RespostaErro"}}}},"403":{"description":"Papel sem permissão para a operação","content":{"application/json":{"schema":{"$ref":"#/components/schemas/RespostaErro"}}}},"404":{"description":"Recurso não encontrado","content":{"application/json":{"schema":{"$ref":"#/components/schemas/RespostaErro"}}}},"422":{"description":"Validation Error","content":{"application/json":{"schema":{"$ref":"#/components/schemas/HTTPValidationError"}}}}}}},"/api/v1/parametros":{"get":{"tags":["Gestão"],"summary":"Valores de referência vigentes","description":"Salário mínimo, linha de pobreza e demais valores usados pelas regras. Atualizar um parâmetro reajusta automaticamente todas as regras derivadas dele.","operationId":"listar_parametros_api_v1_parametros_get","responses":{"200":{"description":"Successful Response","content":{"application/json":{"schema":{"items":{"$ref":"#/components/schemas/ParametroResposta"},"type":"array","title":"Response Listar Parametros Api V1 Parametros Get"}}}}}}},"/api/v1/parametros/{chave}":{"put":{"tags":["Gestão"],"summary":"Atualiza ou cria um parâmetro (admin)","operationId":"atualizar_parametro_api_v1_parametros__chave__put","security":[{"OAuth2PasswordBearer":[]}],"parameters":[{"name":"chave","in":"path","required":true,"schema":{"type":"string","title":"Chave"}}],"requestBody":{"required":true,"content":{"application/json":{"schema":{"$ref":"#/components/schemas/ParametroAtualizar"}}}},"responses":{"200":{"description":"Successful Response","content":{"application/json":{"schema":{"$ref":"#/components/schemas/ParametroResposta"}}}},"401":{"description":"Token ausente ou inválido","content":{"application/json":{"schema":{"$ref":"#/components/schemas/RespostaErro"}}}},"403":{"description":"Papel sem permissão para a operação","content":{"application/json":{"schema":{"$ref":"#/components/schemas/RespostaErro"}}}},"422":{"description":"Validation Error","content":{"application/json":{"schema":{"$ref":"#/components/schemas/HTTPValidationError"}}}}}}},"/api/v1/relatorios/cobertura":{"get":{"tags":["Gestão"],"summary":"Cobertura potencial por programa (admin)","description":"Reavalia todas as famílias cadastradas e informa quantas seriam elegíveis a cada programa. Indicador de referência para o monitoramento da meta 1.3 do ODS 1.","operationId":"cobertura_api_v1_relatorios_cobertura_get","security":[{"OAuth2PasswordBearer":[]}],"parameters":[{"name":"municipio","in":"query","required":false,"schema":{"anyOf":[{"type":"string"},{"type":"null"}],"title":"Municipio"}},{"name":"uf","in":"query","required":false,"schema":{"anyOf":[{"type":"string"},{"type":"null"}],"title":"Uf"}}],"responses":{"200":{"description":"Successful Response","content":{"application/json":{"schema":{}}}},"401":{"description":"Token ausente ou inválido","content":{"application/json":{"schema":{"$ref":"#/components/schemas/RespostaErro"}}}},"403":{"description":"Papel sem permissão para a operação","content":{"application/json":{"schema":{"$ref":"#/components/schemas/RespostaErro"}}}},"422":{"description":"Validation Error","content":{"application/json":{"schema":{"$ref":"#/components/schemas/HTTPValidationError"}}}}}}},"/api/v1/relatorios/pendencias-frequentes":{"get":{"tags":["Gestão"],"summary":"Requisitos que mais reprovam (admin)","description":"Ranking dos requisitos que mais bloqueiam o acesso a benefícios. Ajuda a direcionar busca ativa: se o campeão for a ausência de CadÚnico, o gargalo é cadastral, não de renda.","operationId":"pendencias_frequentes_api_v1_relatorios_pendencias_frequentes_get","security":[{"OAuth2PasswordBearer":[]}],"parameters":[{"name":"limite","in":"query","required":false,"schema":{"type":"integer","maximum":50,"minimum":1,"default":10,"title":"Limite"}}],"responses":{"200":{"description":"Successful Response","content":{"application/json":{"schema":{}}}},"401":{"description":"Token ausente ou inválido","content":{"application/json":{"schema":{"$ref":"#/components/schemas/RespostaErro"}}}},"403":{"description":"Papel sem permissão para a operação","content":{"application/json":{"schema":{"$ref":"#/components/schemas/RespostaErro"}}}},"422":{"description":"Validation Error","content":{"application/json":{"schema":{"$ref":"#/components/schemas/HTTPValidationError"}}}}}}},"/api/v1/health":{"get":{"tags":["Gestão","Infraestrutura"],"summary":"Healthcheck","operationId":"health_api_v1_health_get","responses":{"200":{"description":"Successful Response","content":{"application/json":{"schema":{}}}}}}}},"components":{"schemas":{"AvaliacaoRegraResposta":{"properties":{"codigo":{"type":"string","title":"Codigo"},"descricao":{"type":"string","title":"Descricao"},"atendida":{"type":"boolean","title":"Atendida"},"valor_informado":{"anyOf":[{},{"type":"null"}],"title":"Valor Informado"},"valor_exigido":{"anyOf":[{},{"type":"null"}],"title":"Valor Exigido"},"orientacao":{"anyOf":[{"type":"string"},{"type":"null"}],"title":"Orientacao"}},"type":"object","required":["codigo","descricao","atendida"],"title":"AvaliacaoRegraResposta"},"DetalheErro":{"properties":{"codigo":{"type":"string","title":"Codigo"},"mensagem":{"type":"string","title":"Mensagem"},"detalhes":{"items":{},"type":"array","title":"Detalhes","default":[]}},"type":"object","required":["codigo","mensagem"],"title":"DetalheErro"},"FamiliaAtualizar":{"properties":{"municipio":{"anyOf":[{"type":"string"},{"type":"null"}],"title":"Municipio"},"uf":{"anyOf":[{"type":"string","maxLength":2,"minLength":2},{"type":"null"}],"title":"Uf"},"renda_total_mensal":{"anyOf":[{"type":"number","minimum":0.0},{"type":"null"}],"title":"Renda Total Mensal"},"situacao_moradia":{"anyOf":[{"type":"string","enum":["propria","alugada","cedida","situacao_rua"]},{"type":"null"}],"title":"Situacao Moradia"},"possui_cadunico":{"anyOf":[{"type":"boolean"},{"type":"null"}],"title":"Possui Cadunico"}},"type":"object","title":"FamiliaAtualizar"},"FamiliaCriar":{"properties":{"municipio":{"type":"string","maxLength":120,"title":"Municipio","examples":["Salvador"]},"uf":{"type":"string","maxLength":2,"minLength":2,"title":"Uf","examples":["BA"]},"renda_total_mensal":{"type":"number","minimum":0.0,"title":"Renda Total Mensal","default":0,"examples":[800.0]},"situacao_moradia":{"type":"string","enum":["propria","alugada","cedida","situacao_rua"],"title":"Situacao Moradia","default":"alugada"},"possui_cadunico":{"type":"boolean","title":"Possui Cadunico","default":false},"membros":{"items":{"$ref":"#/components/schemas/MembroCriar"},"type":"array","title":"Membros","default":[]}},"type":"object","required":["municipio","uf"],"title":"FamiliaCriar"},"FamiliaResposta":{"properties":{"id":{"type":"integer","title":"Id"},"identificador":{"type":"string","title":"Identificador"},"municipio":{"type":"string","title":"Municipio"},"uf":{"type":"string","title":"Uf"},"renda_total_mensal":{"type":"number","title":"Renda Total Mensal"},"possui_cadunico":{"type":"boolean","title":"Possui Cadunico"},"criado_em":{"type":"string","format":"date-time","title":"Criado Em"},"situacao_moradia":{"type":"string","enum":["propria","alugada","cedida","situacao_rua"],"title":"Situacao Moradia"},"atualizado_em":{"type":"string","format":"date-time","title":"Atualizado Em"},"membros":{"items":{"$ref":"#/components/schemas/MembroResposta"},"type":"array","title":"Membros","default":[]},"perfil_calculado":{"additionalProperties":true,"type":"object","title":"Perfil Calculado","default":{}}},"type":"object","required":["id","identificador","municipio","uf","renda_total_mensal","possui_cadunico","criado_em","situacao_moradia","atualizado_em"],"title":"FamiliaResposta"},"FamiliaResumo":{"properties":{"id":{"type":"integer","title":"Id"},"identificador":{"type":"string","title":"Identificador"},"municipio":{"type":"string","title":"Municipio"},"uf":{"type":"string","title":"Uf"},"renda_total_mensal":{"type":"number","title":"Renda Total Mensal"},"possui_cadunico":{"type":"boolean","title":"Possui Cadunico"},"criado_em":{"type":"string","format":"date-time","title":"Criado Em"}},"type":"object","required":["id","identificador","municipio","uf","renda_total_mensal","possui_cadunico","criado_em"],"title":"FamiliaResumo"},"HTTPValidationError":{"properties":{"detail":{"items":{"$ref":"#/components/schemas/ValidationError"},"type":"array","title":"Detail"}},"type":"object","title":"HTTPValidationError"},"LoginRequisicao":{"properties":{"email":{"type":"string","format":"email","title":"Email"},"senha":{"type":"string","title":"Senha"}},"type":"object","required":["email","senha"],"title":"LoginRequisicao"},"MembroAtualizar":{"properties":{"nome":{"anyOf":[{"type":"string"},{"type":"null"}],"title":"Nome"},"data_nascimento":{"anyOf":[{"type":"string","format":"date"},{"type":"null"}],"title":"Data Nascimento"},"parentesco":{"anyOf":[{"type":"string","enum":["responsavel","conjuge","filho","pai","mae","outro"]},{"type":"null"}],"title":"Parentesco"},"escolaridade":{"anyOf":[{"type":"string"},{"type":"null"}],"title":"Escolaridade"},"renda_individual":{"anyOf":[{"type":"number","minimum":0.0},{"type":"null"}],"title":"Renda Individual"},"possui_deficiencia":{"anyOf":[{"type":"boolean"},{"type":"null"}],"title":"Possui Deficiencia"},"gestante":{"anyOf":[{"type":"boolean"},{"type":"null"}],"title":"Gestante"},"frequenta_escola":{"anyOf":[{"type":"boolean"},{"type":"null"}],"title":"Frequenta Escola"}},"type":"object","title":"MembroAtualizar"},"MembroCriar":{"properties":{"nome":{"type":"string","maxLength":80,"title":"Nome","description":"Apenas o primeiro nome. Não informe CPF, NIS ou outro identificador.","examples":["Maria"]},"data_nascimento":{"type":"string","format":"date","title":"Data Nascimento","examples":["1990-03-12"]},"parentesco":{"type":"string","enum":["responsavel","conjuge","filho","pai","mae","outro"],"title":"Parentesco","default":"outro"},"escolaridade":{"anyOf":[{"type":"string"},{"type":"null"}],"title":"Escolaridade"},"renda_individual":{"type":"number","minimum":0.0,"title":"Renda Individual","default":0},"possui_deficiencia":{"type":"boolean","title":"Possui Deficiencia","default":false},"gestante":{"type":"boolean","title":"Gestante","default":false},"frequenta_escola":{"type":"boolean","title":"Frequenta Escola","default":false}},"type":"object","required":["nome","data_nascimento"],"title":"MembroCriar"},"MembroResposta":{"properties":{"nome":{"type":"string","maxLength":80,"title":"Nome","description":"Apenas o primeiro nome. Não informe CPF, NIS ou outro identificador.","examples":["Maria"]},"data_nascimento":{"type":"string","format":"date","title":"Data Nascimento","examples":["1990-03-12"]},"parentesco":{"type":"string","enum":["responsavel","conjuge","filho","pai","mae","outro"],"title":"Parentesco","default":"outro"},"escolaridade":{"anyOf":[{"type":"string"},{"type":"null"}],"title":"Escolaridade"},"renda_individual":{"type":"number","minimum":0.0,"title":"Renda Individual","default":0},"possui_deficiencia":{"type":"boolean","title":"Possui Deficiencia","default":false},"gestante":{"type":"boolean","title":"Gestante","default":false},"frequenta_escola":{"type":"boolean","title":"Frequenta Escola","default":false},"id":{"type":"integer","title":"Id"},"familia_id":{"type":"integer","title":"Familia Id"},"idade":{"anyOf":[{"type":"integer"},{"type":"null"}],"title":"Idade"}},"type":"object","required":["nome","data_nascimento","id","familia_id"],"title":"MembroResposta"},"Pagina_FamiliaResumo_":{"properties":{"itens":{"items":{"$ref":"#/components/schemas/FamiliaResumo"},"type":"array","title":"Itens"},"total":{"type":"integer","title":"Total"},"pagina":{"type":"integer","title":"Pagina"},"tamanho":{"type":"integer","title":"Tamanho"},"total_paginas":{"type":"integer","title":"Total Paginas"}},"type":"object","required":["itens","total","pagina","tamanho","total_paginas"],"title":"Pagina[FamiliaResumo]"},"Pagina_ProgramaResumo_":{"properties":{"itens":{"items":{"$ref":"#/components/schemas/ProgramaResumo"},"type":"array","title":"Itens"},"total":{"type":"integer","title":"Total"},"pagina":{"type":"integer","title":"Pagina"},"tamanho":{"type":"integer","title":"Tamanho"},"total_paginas":{"type":"integer","title":"Total Paginas"}},"type":"object","required":["itens","total","pagina","tamanho","total_paginas"],"title":"Pagina[ProgramaResumo]"},"Pagina_SimulacaoResumo_":{"properties":{"itens":{"items":{"$ref":"#/components/schemas/SimulacaoResumo"},"type":"array","title":"Itens"},"total":{"type":"integer","title":"Total"},"pagina":{"type":"integer","title":"Pagina"},"tamanho":{"type":"integer","title":"Tamanho"},"total_paginas":{"type":"integer","title":"Total Paginas"}},"type":"object","required":["itens","total","pagina","tamanho","total_paginas"],"title":"Pagina[SimulacaoResumo]"},"ParametroAtualizar":{"properties":{"valor":{"type":"number","exclusiveMinimum":0.0,"title":"Valor","examples":[1518.0]},"descricao":{"anyOf":[{"type":"string"},{"type":"null"}],"title":"Descricao"},"fonte":{"anyOf":[{"type":"string"},{"type":"null"}],"title":"Fonte"},"vigencia_inicio":{"anyOf":[{"type":"string","format":"date"},{"type":"null"}],"title":"Vigencia Inicio"}},"type":"object","required":["valor"],"title":"ParametroAtualizar"},"ParametroResposta":{"properties":{"valor":{"type":"number","exclusiveMinimum":0.0,"title":"Valor","examples":[1518.0]},"descricao":{"anyOf":[{"type":"string"},{"type":"null"}],"title":"Descricao"},"fonte":{"anyOf":[{"type":"string"},{"type":"null"}],"title":"Fonte"},"vigencia_inicio":{"anyOf":[{"type":"string","format":"date"},{"type":"null"}],"title":"Vigencia Inicio"},"chave":{"type":"string","title":"Chave"},"atualizado_em":{"type":"string","format":"date-time","title":"Atualizado Em"}},"type":"object","required":["valor","chave","atualizado_em"],"title":"ParametroResposta"},"ProgramaAtualizar":{"properties":{"nome":{"anyOf":[{"type":"string"},{"type":"null"}],"title":"Nome"},"orgao":{"anyOf":[{"type":"string"},{"type":"null"}],"title":"Orgao"},"esfera":{"anyOf":[{"type":"string","enum":["federal","estadual","municipal"]},{"type":"null"}],"title":"Esfera"},"descricao":{"anyOf":[{"type":"string"},{"type":"null"}],"title":"Descricao"},"base_legal":{"anyOf":[{"type":"string"},{"type":"null"}],"title":"Base Legal"},"url_oficial":{"anyOf":[{"type":"string"},{"type":"null"}],"title":"Url Oficial"},"ativo":{"anyOf":[{"type":"boolean"},{"type":"null"}],"title":"Ativo"}},"type":"object","title":"ProgramaAtualizar"},"ProgramaCriar":{"properties":{"nome":{"type":"string","maxLength":160,"title":"Nome","examples":["Bolsa Família"]},"slug":{"type":"string","maxLength":80,"pattern":"^[a-z0-9-]+$","title":"Slug","examples":["bolsa-familia"]},"orgao":{"anyOf":[{"type":"string"},{"type":"null"}],"title":"Orgao","examples":["Ministério do Desenvolvimento e Assistência Social"]},"esfera":{"type":"string","enum":["federal","estadual","municipal"],"title":"Esfera","default":"federal"},"descricao":{"anyOf":[{"type":"string"},{"type":"null"}],"title":"Descricao"},"base_legal":{"anyOf":[{"type":"string"},{"type":"null"}],"title":"Base Legal"},"url_oficial":{"anyOf":[{"type":"string"},{"type":"null"}],"title":"Url Oficial"},"ativo":{"type":"boolean","title":"Ativo","default":true},"regras":{"items":{"$ref":"#/components/schemas/RegraCriar"},"type":"array","title":"Regras","default":[]}},"type":"object","required":["nome","slug"],"title":"ProgramaCriar"},"ProgramaResposta":{"properties":{"id":{"type":"integer","title":"Id"},"nome":{"type":"string","title":"Nome"},"slug":{"type":"string","title":"Slug"},"orgao":{"anyOf":[{"type":"string"},{"type":"null"}],"title":"Orgao"},"esfera":{"type":"string","enum":["federal","estadual","municipal"],"title":"Esfera"},"ativo":{"type":"boolean","title":"Ativo"},"descricao":{"anyOf":[{"type":"string"},{"type":"null"}],"title":"Descricao"},"base_legal":{"anyOf":[{"type":"string"},{"type":"null"}],"title":"Base Legal"},"url_oficial":{"anyOf":[{"type":"string"},{"type":"null"}],"title":"Url Oficial"},"criado_em":{"type":"string","format":"date-time","title":"Criado Em"},"regras":{"items":{"$ref":"#/components/schemas/RegraResposta"},"type":"array","title":"Regras","default":[]}},"type":"object","required":["id","nome","slug","orgao","esfera","ativo","descricao","base_legal","url_oficial","criado_em"],"title":"ProgramaResposta"},"ProgramaResumo":{"properties":{"id":{"type":"integer","title":"Id"},"nome":{"type":"string","title":"Nome"},"slug":{"type":"string","title":"Slug"},"orgao":{"anyOf":[{"type":"string"},{"type":"null"}],"title":"Orgao"},"esfera":{"type":"string","enum":["federal","estadual","municipal"],"title":"Esfera"},"ativo":{"type":"boolean","title":"Ativo"}},"type":"object","required":["id","nome","slug","orgao","esfera","ativo"],"title":"ProgramaResumo"},"RegraCriar":{"properties":{"codigo":{"type":"string","maxLength":60,"title":"Codigo","examples":["BF_RENDA"]},"descricao":{"type":"string","maxLength":255,"title":"Descricao","examples":["Renda familiar por pessoa dentro do limite"]},"campo":{"type":"string","maxLength":60,"title":"Campo","examples":["renda_per_capita"]},"operador":{"type":"string","enum":["==","!=","<","<=",">",">=","in","entre"],"title":"Operador","examples":["<="]},"valor":{"type":"string","title":"Valor","examples":["218"]},"tipo_valor":{"type":"string","enum":["numero","booleano","texto","lista","intervalo","parametro"],"title":"Tipo Valor","default":"numero"},"obrigatoria":{"type":"boolean","title":"Obrigatoria","default":true},"grupo_logico":{"anyOf":[{"type":"string"},{"type":"null"}],"title":"Grupo Logico","description":"Regras com o mesmo grupo são avaliadas em OR entre si."},"orientacao":{"anyOf":[{"type":"string"},{"type":"null"}],"title":"Orientacao"},"ordem":{"type":"integer","title":"Ordem","default":0}},"type":"object","required":["codigo","descricao","campo","operador","valor"],"title":"RegraCriar"},"RegraResposta":{"properties":{"codigo":{"type":"string","maxLength":60,"title":"Codigo","examples":["BF_RENDA"]},"descricao":{"type":"string","maxLength":255,"title":"Descricao","examples":["Renda familiar por pessoa dentro do limite"]},"campo":{"type":"string","maxLength":60,"title":"Campo","examples":["renda_per_capita"]},"operador":{"type":"string","enum":["==","!=","<","<=",">",">=","in","entre"],"title":"Operador","examples":["<="]},"valor":{"type":"string","title":"Valor","examples":["218"]},"tipo_valor":{"type":"string","enum":["numero","booleano","texto","lista","intervalo","parametro"],"title":"Tipo Valor","default":"numero"},"obrigatoria":{"type":"boolean","title":"Obrigatoria","default":true},"grupo_logico":{"anyOf":[{"type":"string"},{"type":"null"}],"title":"Grupo Logico","description":"Regras com o mesmo grupo são avaliadas em OR entre si."},"orientacao":{"anyOf":[{"type":"string"},{"type":"null"}],"title":"Orientacao"},"ordem":{"type":"integer","title":"Ordem","default":0},"id":{"type":"integer","title":"Id"},"programa_id":{"type":"integer","title":"Programa Id"}},"type":"object","required":["codigo","descricao","campo","operador","valor","id","programa_id"],"title":"RegraResposta"},"RequisitoLegivel":{"properties":{"codigo":{"type":"string","title":"Codigo"},"descricao":{"type":"string","title":"Descricao"},"obrigatorio":{"type":"boolean","title":"Obrigatorio"},"condicao":{"type":"string","title":"Condicao","description":"Regra traduzida para leitura humana."}},"type":"object","required":["codigo","descricao","obrigatorio","condicao"],"title":"RequisitoLegivel"},"RespostaErro":{"properties":{"erro":{"$ref":"#/components/schemas/DetalheErro"}},"type":"object","required":["erro"],"title":"RespostaErro"},"ResultadoProgramaResposta":{"properties":{"programa_id":{"type":"integer","title":"Programa Id"},"programa_nome":{"type":"string","title":"Programa Nome"},"elegivel":{"type":"boolean","title":"Elegivel"},"percentual_atendimento":{"type":"number","title":"Percentual Atendimento"},"regras_atendidas":{"items":{"$ref":"#/components/schemas/AvaliacaoRegraResposta"},"type":"array","title":"Regras Atendidas","default":[]},"pendencias":{"items":{"$ref":"#/components/schemas/AvaliacaoRegraResposta"},"type":"array","title":"Pendencias","default":[]}},"type":"object","required":["programa_id","programa_nome","elegivel","percentual_atendimento"],"title":"ResultadoProgramaResposta"},"ResumoSimulacao":{"properties":{"programas_avaliados":{"type":"integer","title":"Programas Avaliados"},"elegivel_em":{"type":"integer","title":"Elegivel Em"},"quase_elegivel_em":{"type":"integer","title":"Quase Elegivel Em","description":"Programas inelegíveis com 70% ou mais dos requisitos atendidos."}},"type":"object","required":["programas_avaliados","elegivel_em","quase_elegivel_em"],"title":"ResumoSimulacao"},"SimulacaoAnonima":{"properties":{"municipio":{"type":"string","maxLength":120,"title":"Municipio","examples":["Salvador"]},"uf":{"type":"string","maxLength":2,"minLength":2,"title":"Uf","examples":["BA"]},"renda_total_mensal":{"type":"number","minimum":0.0,"title":"Renda Total Mensal","default":0,"examples":[800.0]},"situacao_moradia":{"type":"string","enum":["propria","alugada","cedida","situacao_rua"],"title":"Situacao Moradia","default":"alugada"},"possui_cadunico":{"type":"boolean","title":"Possui Cadunico","default":false},"membros":{"items":{"$ref":"#/components/schemas/MembroCriar"},"type":"array","minItems":1,"title":"Membros"}},"type":"object","required":["municipio","uf","membros"],"title":"SimulacaoAnonima","description":"Payload da simulação pública: nada é gravado no banco."},"SimulacaoResposta":{"properties":{"simulacao_id":{"anyOf":[{"type":"integer"},{"type":"null"}],"title":"Simulacao Id"},"familia_id":{"anyOf":[{"type":"integer"},{"type":"null"}],"title":"Familia Id"},"criado_em":{"anyOf":[{"type":"string","format":"date-time"},{"type":"null"}],"title":"Criado Em"},"perfil_calculado":{"additionalProperties":true,"type":"object","title":"Perfil Calculado"},"resumo":{"$ref":"#/components/schemas/ResumoSimulacao"},"resultados":{"items":{"$ref":"#/components/schemas/ResultadoProgramaResposta"},"type":"array","title":"Resultados"}},"type":"object","required":["perfil_calculado","resumo","resultados"],"title":"SimulacaoResposta"},"SimulacaoResumo":{"properties":{"id":{"type":"integer","title":"Id"},"familia_id":{"anyOf":[{"type":"integer"},{"type":"null"}],"title":"Familia Id"},"criado_em":{"type":"string","format":"date-time","title":"Criado Em"},"total_elegiveis":{"type":"integer","title":"Total Elegiveis","default":0}},"type":"object","required":["id","familia_id","criado_em"],"title":"SimulacaoResumo"},"TokenResposta":{"properties":{"access_token":{"type":"string","title":"Access Token"},"token_type":{"type":"string","title":"Token Type","default":"bearer"},"expira_em_minutos":{"type":"integer","title":"Expira Em Minutos"},"usuario":{"$ref":"#/components/schemas/UsuarioResposta"}},"type":"object","required":["access_token","expira_em_minutos","usuario"],"title":"TokenResposta"},"UsuarioCriar":{"properties":{"nome":{"type":"string","maxLength":120,"minLength":2,"title":"Nome","examples":["Maria Souza"]},"email":{"type":"string","format":"email","title":"Email","examples":["maria@cras.salvador.ba.gov.br"]},"senha":{"type":"string","maxLength":72,"minLength":8,"title":"Senha","examples":["senhaSegura123"]},"papel":{"type":"string","enum":["admin","assistente_social","cidadao"],"title":"Papel","description":"Apenas administradores podem criar outro admin.","default":"cidadao"}},"type":"object","required":["nome","email","senha"],"title":"UsuarioCriar"},"UsuarioResposta":{"properties":{"id":{"type":"integer","title":"Id"},"nome":{"type":"string","title":"Nome"},"email":{"type":"string","format":"email","title":"Email"},"papel":{"type":"string","enum":["admin","assistente_social","cidadao"],"title":"Papel"},"ativo":{"type":"boolean","title":"Ativo"},"criado_em":{"type":"string","format":"date-time","title":"Criado Em"}},"type":"object","required":["id","nome","email","papel","ativo","criado_em"],"title":"UsuarioResposta"},"ValidationError":{"properties":{"loc":{"items":{"anyOf":[{"type":"string"},{"type":"integer"}]},"type":"array","title":"Location"},"msg":{"type":"string","title":"Message"},"type":{"type":"string","title":"Error Type"},"input":{"title":"Input"},"ctx":{"type":"object","title":"Context"}},"type":"object","required":["loc","msg","type"],"title":"ValidationError"}},"securitySchemes":{"OAuth2PasswordBearer":{"type":"oauth2","flows":{"password":{"scopes":{},"tokenUrl":"/api/v1/auth/login"}}}}},"tags":[{"name":"Elegibilidade","description":"Simulação do direito a benefícios."},{"name":"Programas","description":"Catálogo de programas e seus requisitos."},{"name":"Famílias","description":"Cadastro socioeconômico e composição familiar."},{"name":"Gestão","description":"Parâmetros de referência e relatórios agregados."},{"name":"Autenticação","description":"Registro, login e emissão de token JWT."},{"name":"Infraestrutura","description":"Healthcheck."}]}
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Mapa do Direito",
+    "description": "\nAPI que identifica a quais programas de transferência de renda e benefícios sociais\numa família tem direito, e — quando ainda não tem — **exatamente o que falta** para\nse enquadrar.\n\n### Problema\nParte significativa das famílias em situação de vulnerabilidade não acessa benefícios\naos quais já teria direito, por desconhecimento dos critérios ou por pendências\ncadastrais simples. O caminho inverso também ocorre: pessoas tentam o benefício,\nsão negadas e não recebem orientação sobre o motivo.\n\n### Como funciona\nAs regras de elegibilidade **não estão codificadas em `if/else`**: ficam no banco como\ndados declarativos (`campo` + `operador` + `valor`). Isso permite cadastrar um programa\nnovo ou reajustar um limite de renda sem alterar uma linha de código.\n\n### Papéis\n| Papel | Permissões |\n|---|---|\n| `cidadao` | Simulação, cadastro e histórico da própria família |\n| `assistente_social` | Cadastro de famílias atendidas e simulações com histórico |\n| `admin` | Gestão de programas, regras, parâmetros, usuários e relatórios |\n\n### Privacidade\nEm conformidade com a LGPD, a API **não recebe nem armazena CPF, NIS ou qualquer\nidentificador direto**. Cada família recebe um código interno opaco.\n",
+    "contact": {
+      "name": "Luiz Eduardo Reis Souza",
+      "email": "luiz.e.souzadev@gmail.com"
+    },
+    "license": {
+      "name": "MIT"
+    },
+    "version": "1.0.0"
+  },
+  "paths": {
+    "/api/v1/auth/registrar": {
+      "post": {
+        "tags": [
+          "Autenticação"
+        ],
+        "summary": "Cria uma nova conta",
+        "description": "Cadastro público. A conta nasce sempre com o papel `cidadao`; contas de assistente social e administrador são criadas por um administrador em `/usuarios`.",
+        "operationId": "registrar_api_v1_auth_registrar_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UsuarioRegistro"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UsuarioResposta"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/login": {
+      "post": {
+        "tags": [
+          "Autenticação"
+        ],
+        "summary": "Autentica e devolve o token JWT",
+        "operationId": "login_api_v1_auth_login_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginRequisicao"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TokenResposta"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token ausente ou inválido",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RespostaErro"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/me": {
+      "get": {
+        "tags": [
+          "Autenticação"
+        ],
+        "summary": "Dados do usuário autenticado",
+        "operationId": "eu_api_v1_auth_me_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UsuarioResposta"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token ausente ou inválido",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RespostaErro"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/usuarios": {
+      "get": {
+        "tags": [
+          "Usuários"
+        ],
+        "summary": "Lista usuários (admin)",
+        "operationId": "listar_usuarios_api_v1_usuarios_get",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "busca",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Busca por nome ou e-mail.",
+              "title": "Busca"
+            },
+            "description": "Busca por nome ou e-mail."
+          },
+          {
+            "name": "papel",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "admin, assistente_social ou cidadao",
+              "title": "Papel"
+            },
+            "description": "admin, assistente_social ou cidadao"
+          },
+          {
+            "name": "ativo",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Ativo"
+            }
+          },
+          {
+            "name": "pagina",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "Página desejada, começando em 1.",
+              "default": 1,
+              "title": "Pagina"
+            },
+            "description": "Página desejada, começando em 1."
+          },
+          {
+            "name": "tamanho",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "description": "Itens por página (máx. 100).",
+              "default": 20,
+              "title": "Tamanho"
+            },
+            "description": "Itens por página (máx. 100)."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Pagina_UsuarioResposta_"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token ausente ou inválido",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RespostaErro"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Papel sem permissão para a operação",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RespostaErro"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Usuários"
+        ],
+        "summary": "Cria uma conta com qualquer papel (admin)",
+        "operationId": "criar_usuario_api_v1_usuarios_post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UsuarioCriar"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UsuarioResposta"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token ausente ou inválido",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RespostaErro"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Papel sem permissão para a operação",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RespostaErro"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/usuarios/{usuario_id}": {
+      "patch": {
+        "tags": [
+          "Usuários"
+        ],
+        "summary": "Atualiza papel, situação, nome ou senha (admin)",
+        "description": "Atualização parcial. Um administrador não pode rebaixar nem desativar a própria conta.",
+        "operationId": "atualizar_usuario_api_v1_usuarios__usuario_id__patch",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "usuario_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Usuario Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UsuarioAtualizar"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UsuarioResposta"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token ausente ou inválido",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RespostaErro"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Papel sem permissão para a operação",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RespostaErro"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Recurso não encontrado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RespostaErro"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/programas": {
+      "get": {
+        "tags": [
+          "Programas"
+        ],
+        "summary": "Lista os programas do catálogo",
+        "description": "Endpoint público e paginado. Aceita filtros por esfera, situação e texto livre.",
+        "operationId": "listar_programas_api_v1_programas_get",
+        "parameters": [
+          {
+            "name": "esfera",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "federal, estadual ou municipal",
+              "title": "Esfera"
+            },
+            "description": "federal, estadual ou municipal"
+          },
+          {
+            "name": "ativo",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Ativo"
+            }
+          },
+          {
+            "name": "busca",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Busca por nome ou órgão responsável.",
+              "title": "Busca"
+            },
+            "description": "Busca por nome ou órgão responsável."
+          },
+          {
+            "name": "pagina",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "Página desejada, começando em 1.",
+              "default": 1,
+              "title": "Pagina"
+            },
+            "description": "Página desejada, começando em 1."
+          },
+          {
+            "name": "tamanho",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "description": "Itens por página (máx. 100).",
+              "default": 20,
+              "title": "Tamanho"
+            },
+            "description": "Itens por página (máx. 100)."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Pagina_ProgramaResumo_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Programas"
+        ],
+        "summary": "Cadastra um programa (admin)",
+        "operationId": "criar_programa_api_v1_programas_post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProgramaCriar"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProgramaResposta"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token ausente ou inválido",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RespostaErro"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Papel sem permissão para a operação",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RespostaErro"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/programas/{programa_id}": {
+      "get": {
+        "tags": [
+          "Programas"
+        ],
+        "summary": "Detalha um programa e suas regras",
+        "operationId": "detalhar_programa_api_v1_programas__programa_id__get",
+        "parameters": [
+          {
+            "name": "programa_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Programa Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProgramaResposta"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Recurso não encontrado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RespostaErro"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Programas"
+        ],
+        "summary": "Atualiza um programa (admin)",
+        "operationId": "atualizar_programa_api_v1_programas__programa_id__put",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "programa_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Programa Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProgramaAtualizar"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProgramaResposta"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token ausente ou inválido",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RespostaErro"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Papel sem permissão para a operação",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RespostaErro"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Recurso não encontrado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RespostaErro"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Programas"
+        ],
+        "summary": "Desativa um programa (admin)",
+        "description": "Exclusão lógica: o histórico de simulações continua íntegro.",
+        "operationId": "desativar_programa_api_v1_programas__programa_id__delete",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "programa_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Programa Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "401": {
+            "description": "Token ausente ou inválido",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RespostaErro"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Papel sem permissão para a operação",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RespostaErro"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Recurso não encontrado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RespostaErro"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/programas/{programa_id}/requisitos": {
+      "get": {
+        "tags": [
+          "Programas"
+        ],
+        "summary": "Requisitos em linguagem simples",
+        "description": "Traduz as regras declarativas para frases legíveis por qualquer cidadão.",
+        "operationId": "requisitos_api_v1_programas__programa_id__requisitos_get",
+        "parameters": [
+          {
+            "name": "programa_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Programa Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/RequisitoLegivel"
+                  },
+                  "title": "Response Requisitos Api V1 Programas  Programa Id  Requisitos Get"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Recurso não encontrado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RespostaErro"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/programas/{programa_id}/regras": {
+      "post": {
+        "tags": [
+          "Programas"
+        ],
+        "summary": "Adiciona uma regra de elegibilidade (admin)",
+        "operationId": "adicionar_regra_api_v1_programas__programa_id__regras_post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "programa_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Programa Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegraCriar"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegraResposta"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token ausente ou inválido",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RespostaErro"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Papel sem permissão para a operação",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RespostaErro"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Recurso não encontrado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RespostaErro"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/regras/{regra_id}": {
+      "put": {
+        "tags": [
+          "Programas"
+        ],
+        "summary": "Atualiza uma regra de elegibilidade (admin)",
+        "description": "Atualização parcial: apenas os campos enviados são alterados.",
+        "operationId": "atualizar_regra_api_v1_regras__regra_id__put",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "regra_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Regra Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegraAtualizar"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegraResposta"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token ausente ou inválido",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RespostaErro"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Papel sem permissão para a operação",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RespostaErro"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Recurso não encontrado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RespostaErro"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Programas"
+        ],
+        "summary": "Remove uma regra (admin)",
+        "operationId": "remover_regra_api_v1_regras__regra_id__delete",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "regra_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Regra Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "401": {
+            "description": "Token ausente ou inválido",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RespostaErro"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Papel sem permissão para a operação",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RespostaErro"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Recurso não encontrado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RespostaErro"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/familias": {
+      "post": {
+        "tags": [
+          "Famílias"
+        ],
+        "summary": "Cadastra uma família",
+        "description": "Disponível para assistentes sociais e administradores. Por conformidade com a LGPD, a API não recebe CPF, NIS ou qualquer identificador direto: a família recebe um código interno opaco.",
+        "operationId": "criar_familia_api_v1_familias_post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FamiliaCriar"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FamiliaResposta"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token ausente ou inválido",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RespostaErro"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Papel sem permissão para a operação",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RespostaErro"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "Famílias"
+        ],
+        "summary": "Lista famílias cadastradas",
+        "description": "Administradores veem todas; assistentes sociais veem apenas os próprios cadastros.",
+        "operationId": "listar_familias_api_v1_familias_get",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "municipio",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Municipio"
+            }
+          },
+          {
+            "name": "uf",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 2,
+                  "maxLength": 2
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Uf"
+            }
+          },
+          {
+            "name": "possui_cadunico",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Possui Cadunico"
+            }
+          },
+          {
+            "name": "pagina",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "Página desejada, começando em 1.",
+              "default": 1,
+              "title": "Pagina"
+            },
+            "description": "Página desejada, começando em 1."
+          },
+          {
+            "name": "tamanho",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "description": "Itens por página (máx. 100).",
+              "default": 20,
+              "title": "Tamanho"
+            },
+            "description": "Itens por página (máx. 100)."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Pagina_FamiliaResumo_"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token ausente ou inválido",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RespostaErro"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Papel sem permissão para a operação",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RespostaErro"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/familias/{familia_id}": {
+      "get": {
+        "tags": [
+          "Famílias"
+        ],
+        "summary": "Detalha uma família com o perfil calculado",
+        "operationId": "detalhar_familia_api_v1_familias__familia_id__get",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "familia_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Familia Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FamiliaResposta"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token ausente ou inválido",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RespostaErro"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Papel sem permissão para a operação",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RespostaErro"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Recurso não encontrado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RespostaErro"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Famílias"
+        ],
+        "summary": "Atualiza os dados da família",
+        "operationId": "atualizar_familia_api_v1_familias__familia_id__put",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "familia_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Familia Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FamiliaAtualizar"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FamiliaResposta"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token ausente ou inválido",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RespostaErro"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Papel sem permissão para a operação",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RespostaErro"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Recurso não encontrado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RespostaErro"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Famílias"
+        ],
+        "summary": "Exclui a família e todo o seu histórico",
+        "description": "Permitido ao responsável pelo cadastro ou a um administrador.",
+        "operationId": "excluir_familia_api_v1_familias__familia_id__delete",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "familia_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Familia Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "401": {
+            "description": "Token ausente ou inválido",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RespostaErro"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Papel sem permissão para a operação",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RespostaErro"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Recurso não encontrado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RespostaErro"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/familias/{familia_id}/membros": {
+      "post": {
+        "tags": [
+          "Famílias"
+        ],
+        "summary": "Adiciona um membro à família",
+        "operationId": "adicionar_membro_api_v1_familias__familia_id__membros_post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "familia_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Familia Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MembroCriar"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MembroResposta"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token ausente ou inválido",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RespostaErro"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Papel sem permissão para a operação",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RespostaErro"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Recurso não encontrado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RespostaErro"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "Famílias"
+        ],
+        "summary": "Lista os membros da família",
+        "operationId": "listar_membros_api_v1_familias__familia_id__membros_get",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "familia_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Familia Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/MembroResposta"
+                  },
+                  "title": "Response Listar Membros Api V1 Familias  Familia Id  Membros Get"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token ausente ou inválido",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RespostaErro"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Papel sem permissão para a operação",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RespostaErro"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Recurso não encontrado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RespostaErro"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/membros/{membro_id}": {
+      "put": {
+        "tags": [
+          "Famílias"
+        ],
+        "summary": "Atualiza um membro",
+        "operationId": "atualizar_membro_api_v1_membros__membro_id__put",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "membro_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Membro Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MembroAtualizar"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MembroResposta"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token ausente ou inválido",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RespostaErro"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Papel sem permissão para a operação",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RespostaErro"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Recurso não encontrado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RespostaErro"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Famílias"
+        ],
+        "summary": "Remove um membro",
+        "operationId": "remover_membro_api_v1_membros__membro_id__delete",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "membro_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Membro Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "401": {
+            "description": "Token ausente ou inválido",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RespostaErro"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Papel sem permissão para a operação",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RespostaErro"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Recurso não encontrado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RespostaErro"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/elegibilidade/simular": {
+      "post": {
+        "tags": [
+          "Elegibilidade"
+        ],
+        "summary": "Simula a elegibilidade sem cadastro (público)",
+        "description": "Avalia o perfil informado contra todos os programas ativos e devolve, para cada um, se a família é elegível, quais requisitos já são atendidos e, quando não é elegível, exatamente o que falta. Nenhum dado é gravado.",
+        "operationId": "simular_anonimo_api_v1_elegibilidade_simular_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SimulacaoAnonima"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SimulacaoResposta"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/familias/{familia_id}/simulacoes": {
+      "post": {
+        "tags": [
+          "Elegibilidade"
+        ],
+        "summary": "Simula e registra o resultado no histórico da família",
+        "operationId": "simular_familia_api_v1_familias__familia_id__simulacoes_post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "familia_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Familia Id"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SimulacaoResposta"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token ausente ou inválido",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RespostaErro"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Papel sem permissão para a operação",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RespostaErro"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Recurso não encontrado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RespostaErro"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "Elegibilidade"
+        ],
+        "summary": "Histórico de simulações da família",
+        "operationId": "listar_simulacoes_api_v1_familias__familia_id__simulacoes_get",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "familia_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Familia Id"
+            }
+          },
+          {
+            "name": "pagina",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "Página desejada, começando em 1.",
+              "default": 1,
+              "title": "Pagina"
+            },
+            "description": "Página desejada, começando em 1."
+          },
+          {
+            "name": "tamanho",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "description": "Itens por página (máx. 100).",
+              "default": 20,
+              "title": "Tamanho"
+            },
+            "description": "Itens por página (máx. 100)."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Pagina_SimulacaoResumo_"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token ausente ou inválido",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RespostaErro"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Papel sem permissão para a operação",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RespostaErro"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Recurso não encontrado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RespostaErro"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/simulacoes/{simulacao_id}": {
+      "get": {
+        "tags": [
+          "Elegibilidade"
+        ],
+        "summary": "Resultado detalhado de uma simulação",
+        "operationId": "detalhar_simulacao_api_v1_simulacoes__simulacao_id__get",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "simulacao_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Simulacao Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SimulacaoResposta"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token ausente ou inválido",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RespostaErro"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Papel sem permissão para a operação",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RespostaErro"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Recurso não encontrado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RespostaErro"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/parametros": {
+      "get": {
+        "tags": [
+          "Gestão"
+        ],
+        "summary": "Valores de referência vigentes",
+        "description": "Salário mínimo, linha de pobreza e demais valores usados pelas regras. Atualizar um parâmetro reajusta automaticamente todas as regras derivadas dele.",
+        "operationId": "listar_parametros_api_v1_parametros_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ParametroResposta"
+                  },
+                  "type": "array",
+                  "title": "Response Listar Parametros Api V1 Parametros Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/parametros/{chave}": {
+      "put": {
+        "tags": [
+          "Gestão"
+        ],
+        "summary": "Atualiza ou cria um parâmetro (admin)",
+        "operationId": "atualizar_parametro_api_v1_parametros__chave__put",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "chave",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Chave"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ParametroAtualizar"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ParametroResposta"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token ausente ou inválido",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RespostaErro"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Papel sem permissão para a operação",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RespostaErro"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/relatorios/cobertura": {
+      "get": {
+        "tags": [
+          "Gestão"
+        ],
+        "summary": "Cobertura potencial por programa (admin)",
+        "description": "Reavalia todas as famílias cadastradas e informa quantas seriam elegíveis a cada programa. Indicador de referência para o monitoramento da meta 1.3 do ODS 1.",
+        "operationId": "cobertura_api_v1_relatorios_cobertura_get",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "municipio",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Municipio"
+            }
+          },
+          {
+            "name": "uf",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Uf"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "401": {
+            "description": "Token ausente ou inválido",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RespostaErro"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Papel sem permissão para a operação",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RespostaErro"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/relatorios/pendencias-frequentes": {
+      "get": {
+        "tags": [
+          "Gestão"
+        ],
+        "summary": "Requisitos que mais reprovam (admin)",
+        "description": "Ranking dos requisitos que mais bloqueiam o acesso a benefícios. Ajuda a direcionar busca ativa: se o campeão for a ausência de CadÚnico, o gargalo é cadastral, não de renda.",
+        "operationId": "pendencias_frequentes_api_v1_relatorios_pendencias_frequentes_get",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "limite",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 50,
+              "minimum": 1,
+              "default": 10,
+              "title": "Limite"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "401": {
+            "description": "Token ausente ou inválido",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RespostaErro"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Papel sem permissão para a operação",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RespostaErro"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/health": {
+      "get": {
+        "tags": [
+          "Gestão",
+          "Infraestrutura"
+        ],
+        "summary": "Healthcheck",
+        "operationId": "health_api_v1_health_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "AvaliacaoRegraResposta": {
+        "properties": {
+          "codigo": {
+            "type": "string",
+            "title": "Codigo"
+          },
+          "descricao": {
+            "type": "string",
+            "title": "Descricao"
+          },
+          "atendida": {
+            "type": "boolean",
+            "title": "Atendida"
+          },
+          "valor_informado": {
+            "anyOf": [
+              {},
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Valor Informado"
+          },
+          "valor_exigido": {
+            "anyOf": [
+              {},
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Valor Exigido"
+          },
+          "orientacao": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Orientacao"
+          }
+        },
+        "type": "object",
+        "required": [
+          "codigo",
+          "descricao",
+          "atendida"
+        ],
+        "title": "AvaliacaoRegraResposta"
+      },
+      "DetalheErro": {
+        "properties": {
+          "codigo": {
+            "type": "string",
+            "title": "Codigo"
+          },
+          "mensagem": {
+            "type": "string",
+            "title": "Mensagem"
+          },
+          "detalhes": {
+            "items": {},
+            "type": "array",
+            "title": "Detalhes",
+            "default": []
+          }
+        },
+        "type": "object",
+        "required": [
+          "codigo",
+          "mensagem"
+        ],
+        "title": "DetalheErro"
+      },
+      "FamiliaAtualizar": {
+        "properties": {
+          "municipio": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Municipio"
+          },
+          "uf": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 2,
+                "minLength": 2
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Uf"
+          },
+          "renda_total_mensal": {
+            "anyOf": [
+              {
+                "type": "number",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Renda Total Mensal"
+          },
+          "situacao_moradia": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "propria",
+                  "alugada",
+                  "cedida",
+                  "situacao_rua"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Situacao Moradia"
+          },
+          "possui_cadunico": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Possui Cadunico"
+          }
+        },
+        "type": "object",
+        "title": "FamiliaAtualizar"
+      },
+      "FamiliaCriar": {
+        "properties": {
+          "municipio": {
+            "type": "string",
+            "maxLength": 120,
+            "title": "Municipio",
+            "examples": [
+              "Salvador"
+            ]
+          },
+          "uf": {
+            "type": "string",
+            "maxLength": 2,
+            "minLength": 2,
+            "title": "Uf",
+            "examples": [
+              "BA"
+            ]
+          },
+          "renda_total_mensal": {
+            "type": "number",
+            "minimum": 0.0,
+            "title": "Renda Total Mensal",
+            "default": 0,
+            "examples": [
+              800.0
+            ]
+          },
+          "situacao_moradia": {
+            "type": "string",
+            "enum": [
+              "propria",
+              "alugada",
+              "cedida",
+              "situacao_rua"
+            ],
+            "title": "Situacao Moradia",
+            "default": "alugada"
+          },
+          "possui_cadunico": {
+            "type": "boolean",
+            "title": "Possui Cadunico",
+            "default": false
+          },
+          "membros": {
+            "items": {
+              "$ref": "#/components/schemas/MembroCriar"
+            },
+            "type": "array",
+            "title": "Membros",
+            "default": []
+          }
+        },
+        "type": "object",
+        "required": [
+          "municipio",
+          "uf"
+        ],
+        "title": "FamiliaCriar"
+      },
+      "FamiliaResposta": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "identificador": {
+            "type": "string",
+            "title": "Identificador"
+          },
+          "municipio": {
+            "type": "string",
+            "title": "Municipio"
+          },
+          "uf": {
+            "type": "string",
+            "title": "Uf"
+          },
+          "renda_total_mensal": {
+            "type": "number",
+            "title": "Renda Total Mensal"
+          },
+          "possui_cadunico": {
+            "type": "boolean",
+            "title": "Possui Cadunico"
+          },
+          "criado_em": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Criado Em"
+          },
+          "situacao_moradia": {
+            "type": "string",
+            "enum": [
+              "propria",
+              "alugada",
+              "cedida",
+              "situacao_rua"
+            ],
+            "title": "Situacao Moradia"
+          },
+          "atualizado_em": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Atualizado Em"
+          },
+          "membros": {
+            "items": {
+              "$ref": "#/components/schemas/MembroResposta"
+            },
+            "type": "array",
+            "title": "Membros",
+            "default": []
+          },
+          "perfil_calculado": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Perfil Calculado",
+            "default": {}
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "identificador",
+          "municipio",
+          "uf",
+          "renda_total_mensal",
+          "possui_cadunico",
+          "criado_em",
+          "situacao_moradia",
+          "atualizado_em"
+        ],
+        "title": "FamiliaResposta"
+      },
+      "FamiliaResumo": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "identificador": {
+            "type": "string",
+            "title": "Identificador"
+          },
+          "municipio": {
+            "type": "string",
+            "title": "Municipio"
+          },
+          "uf": {
+            "type": "string",
+            "title": "Uf"
+          },
+          "renda_total_mensal": {
+            "type": "number",
+            "title": "Renda Total Mensal"
+          },
+          "possui_cadunico": {
+            "type": "boolean",
+            "title": "Possui Cadunico"
+          },
+          "criado_em": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Criado Em"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "identificador",
+          "municipio",
+          "uf",
+          "renda_total_mensal",
+          "possui_cadunico",
+          "criado_em"
+        ],
+        "title": "FamiliaResumo"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "LoginRequisicao": {
+        "properties": {
+          "email": {
+            "type": "string",
+            "format": "email",
+            "title": "Email"
+          },
+          "senha": {
+            "type": "string",
+            "title": "Senha"
+          }
+        },
+        "type": "object",
+        "required": [
+          "email",
+          "senha"
+        ],
+        "title": "LoginRequisicao"
+      },
+      "MembroAtualizar": {
+        "properties": {
+          "nome": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Nome"
+          },
+          "data_nascimento": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Data Nascimento"
+          },
+          "parentesco": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "responsavel",
+                  "conjuge",
+                  "filho",
+                  "pai",
+                  "mae",
+                  "outro"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parentesco"
+          },
+          "escolaridade": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Escolaridade"
+          },
+          "renda_individual": {
+            "anyOf": [
+              {
+                "type": "number",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Renda Individual"
+          },
+          "possui_deficiencia": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Possui Deficiencia"
+          },
+          "gestante": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Gestante"
+          },
+          "frequenta_escola": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Frequenta Escola"
+          }
+        },
+        "type": "object",
+        "title": "MembroAtualizar"
+      },
+      "MembroCriar": {
+        "properties": {
+          "nome": {
+            "type": "string",
+            "maxLength": 80,
+            "title": "Nome",
+            "description": "Apenas o primeiro nome. Não informe CPF, NIS ou outro identificador.",
+            "examples": [
+              "Maria"
+            ]
+          },
+          "data_nascimento": {
+            "type": "string",
+            "format": "date",
+            "title": "Data Nascimento",
+            "examples": [
+              "1990-03-12"
+            ]
+          },
+          "parentesco": {
+            "type": "string",
+            "enum": [
+              "responsavel",
+              "conjuge",
+              "filho",
+              "pai",
+              "mae",
+              "outro"
+            ],
+            "title": "Parentesco",
+            "default": "outro"
+          },
+          "escolaridade": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Escolaridade"
+          },
+          "renda_individual": {
+            "type": "number",
+            "minimum": 0.0,
+            "title": "Renda Individual",
+            "default": 0
+          },
+          "possui_deficiencia": {
+            "type": "boolean",
+            "title": "Possui Deficiencia",
+            "default": false
+          },
+          "gestante": {
+            "type": "boolean",
+            "title": "Gestante",
+            "default": false
+          },
+          "frequenta_escola": {
+            "type": "boolean",
+            "title": "Frequenta Escola",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "nome",
+          "data_nascimento"
+        ],
+        "title": "MembroCriar"
+      },
+      "MembroResposta": {
+        "properties": {
+          "nome": {
+            "type": "string",
+            "maxLength": 80,
+            "title": "Nome",
+            "description": "Apenas o primeiro nome. Não informe CPF, NIS ou outro identificador.",
+            "examples": [
+              "Maria"
+            ]
+          },
+          "data_nascimento": {
+            "type": "string",
+            "format": "date",
+            "title": "Data Nascimento",
+            "examples": [
+              "1990-03-12"
+            ]
+          },
+          "parentesco": {
+            "type": "string",
+            "enum": [
+              "responsavel",
+              "conjuge",
+              "filho",
+              "pai",
+              "mae",
+              "outro"
+            ],
+            "title": "Parentesco",
+            "default": "outro"
+          },
+          "escolaridade": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Escolaridade"
+          },
+          "renda_individual": {
+            "type": "number",
+            "minimum": 0.0,
+            "title": "Renda Individual",
+            "default": 0
+          },
+          "possui_deficiencia": {
+            "type": "boolean",
+            "title": "Possui Deficiencia",
+            "default": false
+          },
+          "gestante": {
+            "type": "boolean",
+            "title": "Gestante",
+            "default": false
+          },
+          "frequenta_escola": {
+            "type": "boolean",
+            "title": "Frequenta Escola",
+            "default": false
+          },
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "familia_id": {
+            "type": "integer",
+            "title": "Familia Id"
+          },
+          "idade": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Idade"
+          }
+        },
+        "type": "object",
+        "required": [
+          "nome",
+          "data_nascimento",
+          "id",
+          "familia_id"
+        ],
+        "title": "MembroResposta"
+      },
+      "Pagina_FamiliaResumo_": {
+        "properties": {
+          "itens": {
+            "items": {
+              "$ref": "#/components/schemas/FamiliaResumo"
+            },
+            "type": "array",
+            "title": "Itens"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "pagina": {
+            "type": "integer",
+            "title": "Pagina"
+          },
+          "tamanho": {
+            "type": "integer",
+            "title": "Tamanho"
+          },
+          "total_paginas": {
+            "type": "integer",
+            "title": "Total Paginas"
+          }
+        },
+        "type": "object",
+        "required": [
+          "itens",
+          "total",
+          "pagina",
+          "tamanho",
+          "total_paginas"
+        ],
+        "title": "Pagina[FamiliaResumo]"
+      },
+      "Pagina_ProgramaResumo_": {
+        "properties": {
+          "itens": {
+            "items": {
+              "$ref": "#/components/schemas/ProgramaResumo"
+            },
+            "type": "array",
+            "title": "Itens"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "pagina": {
+            "type": "integer",
+            "title": "Pagina"
+          },
+          "tamanho": {
+            "type": "integer",
+            "title": "Tamanho"
+          },
+          "total_paginas": {
+            "type": "integer",
+            "title": "Total Paginas"
+          }
+        },
+        "type": "object",
+        "required": [
+          "itens",
+          "total",
+          "pagina",
+          "tamanho",
+          "total_paginas"
+        ],
+        "title": "Pagina[ProgramaResumo]"
+      },
+      "Pagina_SimulacaoResumo_": {
+        "properties": {
+          "itens": {
+            "items": {
+              "$ref": "#/components/schemas/SimulacaoResumo"
+            },
+            "type": "array",
+            "title": "Itens"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "pagina": {
+            "type": "integer",
+            "title": "Pagina"
+          },
+          "tamanho": {
+            "type": "integer",
+            "title": "Tamanho"
+          },
+          "total_paginas": {
+            "type": "integer",
+            "title": "Total Paginas"
+          }
+        },
+        "type": "object",
+        "required": [
+          "itens",
+          "total",
+          "pagina",
+          "tamanho",
+          "total_paginas"
+        ],
+        "title": "Pagina[SimulacaoResumo]"
+      },
+      "Pagina_UsuarioResposta_": {
+        "properties": {
+          "itens": {
+            "items": {
+              "$ref": "#/components/schemas/UsuarioResposta"
+            },
+            "type": "array",
+            "title": "Itens"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "pagina": {
+            "type": "integer",
+            "title": "Pagina"
+          },
+          "tamanho": {
+            "type": "integer",
+            "title": "Tamanho"
+          },
+          "total_paginas": {
+            "type": "integer",
+            "title": "Total Paginas"
+          }
+        },
+        "type": "object",
+        "required": [
+          "itens",
+          "total",
+          "pagina",
+          "tamanho",
+          "total_paginas"
+        ],
+        "title": "Pagina[UsuarioResposta]"
+      },
+      "ParametroAtualizar": {
+        "properties": {
+          "valor": {
+            "type": "number",
+            "exclusiveMinimum": 0.0,
+            "title": "Valor",
+            "examples": [
+              1621.0
+            ]
+          },
+          "descricao": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Descricao"
+          },
+          "fonte": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fonte"
+          },
+          "vigencia_inicio": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Vigencia Inicio"
+          }
+        },
+        "type": "object",
+        "required": [
+          "valor"
+        ],
+        "title": "ParametroAtualizar"
+      },
+      "ParametroResposta": {
+        "properties": {
+          "valor": {
+            "type": "number",
+            "exclusiveMinimum": 0.0,
+            "title": "Valor",
+            "examples": [
+              1621.0
+            ]
+          },
+          "descricao": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Descricao"
+          },
+          "fonte": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fonte"
+          },
+          "vigencia_inicio": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Vigencia Inicio"
+          },
+          "chave": {
+            "type": "string",
+            "title": "Chave"
+          },
+          "atualizado_em": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Atualizado Em"
+          }
+        },
+        "type": "object",
+        "required": [
+          "valor",
+          "chave",
+          "atualizado_em"
+        ],
+        "title": "ParametroResposta"
+      },
+      "ProgramaAtualizar": {
+        "properties": {
+          "nome": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Nome"
+          },
+          "orgao": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Orgao"
+          },
+          "esfera": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "federal",
+                  "estadual",
+                  "municipal"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Esfera"
+          },
+          "descricao": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Descricao"
+          },
+          "base_legal": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Legal"
+          },
+          "url_oficial": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Url Oficial"
+          },
+          "ativo": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ativo"
+          }
+        },
+        "type": "object",
+        "title": "ProgramaAtualizar"
+      },
+      "ProgramaCriar": {
+        "properties": {
+          "nome": {
+            "type": "string",
+            "maxLength": 160,
+            "title": "Nome",
+            "examples": [
+              "Bolsa Família"
+            ]
+          },
+          "slug": {
+            "type": "string",
+            "maxLength": 80,
+            "pattern": "^[a-z0-9-]+$",
+            "title": "Slug",
+            "examples": [
+              "bolsa-familia"
+            ]
+          },
+          "orgao": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Orgao",
+            "examples": [
+              "Ministério do Desenvolvimento e Assistência Social"
+            ]
+          },
+          "esfera": {
+            "type": "string",
+            "enum": [
+              "federal",
+              "estadual",
+              "municipal"
+            ],
+            "title": "Esfera",
+            "default": "federal"
+          },
+          "descricao": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Descricao"
+          },
+          "base_legal": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Legal"
+          },
+          "url_oficial": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Url Oficial"
+          },
+          "ativo": {
+            "type": "boolean",
+            "title": "Ativo",
+            "default": true
+          },
+          "regras": {
+            "items": {
+              "$ref": "#/components/schemas/RegraCriar"
+            },
+            "type": "array",
+            "title": "Regras",
+            "default": []
+          }
+        },
+        "type": "object",
+        "required": [
+          "nome",
+          "slug"
+        ],
+        "title": "ProgramaCriar"
+      },
+      "ProgramaResposta": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "nome": {
+            "type": "string",
+            "title": "Nome"
+          },
+          "slug": {
+            "type": "string",
+            "title": "Slug"
+          },
+          "orgao": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Orgao"
+          },
+          "esfera": {
+            "type": "string",
+            "enum": [
+              "federal",
+              "estadual",
+              "municipal"
+            ],
+            "title": "Esfera"
+          },
+          "ativo": {
+            "type": "boolean",
+            "title": "Ativo"
+          },
+          "descricao": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Descricao"
+          },
+          "base_legal": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Legal"
+          },
+          "url_oficial": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Url Oficial"
+          },
+          "criado_em": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Criado Em"
+          },
+          "regras": {
+            "items": {
+              "$ref": "#/components/schemas/RegraResposta"
+            },
+            "type": "array",
+            "title": "Regras",
+            "default": []
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "nome",
+          "slug",
+          "orgao",
+          "esfera",
+          "ativo",
+          "descricao",
+          "base_legal",
+          "url_oficial",
+          "criado_em"
+        ],
+        "title": "ProgramaResposta"
+      },
+      "ProgramaResumo": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "nome": {
+            "type": "string",
+            "title": "Nome"
+          },
+          "slug": {
+            "type": "string",
+            "title": "Slug"
+          },
+          "orgao": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Orgao"
+          },
+          "esfera": {
+            "type": "string",
+            "enum": [
+              "federal",
+              "estadual",
+              "municipal"
+            ],
+            "title": "Esfera"
+          },
+          "ativo": {
+            "type": "boolean",
+            "title": "Ativo"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "nome",
+          "slug",
+          "orgao",
+          "esfera",
+          "ativo"
+        ],
+        "title": "ProgramaResumo"
+      },
+      "RegraAtualizar": {
+        "properties": {
+          "codigo": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 60
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Codigo"
+          },
+          "descricao": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 255
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Descricao"
+          },
+          "campo": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 60
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Campo"
+          },
+          "operador": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "==",
+                  "!=",
+                  "<",
+                  "<=",
+                  ">",
+                  ">=",
+                  "in",
+                  "entre"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Operador"
+          },
+          "valor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Valor"
+          },
+          "tipo_valor": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "numero",
+                  "booleano",
+                  "texto",
+                  "lista",
+                  "intervalo",
+                  "parametro"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tipo Valor"
+          },
+          "obrigatoria": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Obrigatoria"
+          },
+          "grupo_logico": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Grupo Logico"
+          },
+          "orientacao": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Orientacao"
+          },
+          "ordem": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ordem"
+          }
+        },
+        "type": "object",
+        "title": "RegraAtualizar"
+      },
+      "RegraCriar": {
+        "properties": {
+          "codigo": {
+            "type": "string",
+            "maxLength": 60,
+            "title": "Codigo",
+            "examples": [
+              "BF_RENDA"
+            ]
+          },
+          "descricao": {
+            "type": "string",
+            "maxLength": 255,
+            "title": "Descricao",
+            "examples": [
+              "Renda familiar por pessoa dentro do limite"
+            ]
+          },
+          "campo": {
+            "type": "string",
+            "maxLength": 60,
+            "title": "Campo",
+            "examples": [
+              "renda_per_capita"
+            ]
+          },
+          "operador": {
+            "type": "string",
+            "enum": [
+              "==",
+              "!=",
+              "<",
+              "<=",
+              ">",
+              ">=",
+              "in",
+              "entre"
+            ],
+            "title": "Operador",
+            "examples": [
+              "<="
+            ]
+          },
+          "valor": {
+            "type": "string",
+            "title": "Valor",
+            "examples": [
+              "218"
+            ]
+          },
+          "tipo_valor": {
+            "type": "string",
+            "enum": [
+              "numero",
+              "booleano",
+              "texto",
+              "lista",
+              "intervalo",
+              "parametro"
+            ],
+            "title": "Tipo Valor",
+            "default": "numero"
+          },
+          "obrigatoria": {
+            "type": "boolean",
+            "title": "Obrigatoria",
+            "default": true
+          },
+          "grupo_logico": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Grupo Logico",
+            "description": "Regras com o mesmo grupo são avaliadas em OR entre si."
+          },
+          "orientacao": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Orientacao"
+          },
+          "ordem": {
+            "type": "integer",
+            "title": "Ordem",
+            "default": 0
+          }
+        },
+        "type": "object",
+        "required": [
+          "codigo",
+          "descricao",
+          "campo",
+          "operador",
+          "valor"
+        ],
+        "title": "RegraCriar"
+      },
+      "RegraResposta": {
+        "properties": {
+          "codigo": {
+            "type": "string",
+            "maxLength": 60,
+            "title": "Codigo",
+            "examples": [
+              "BF_RENDA"
+            ]
+          },
+          "descricao": {
+            "type": "string",
+            "maxLength": 255,
+            "title": "Descricao",
+            "examples": [
+              "Renda familiar por pessoa dentro do limite"
+            ]
+          },
+          "campo": {
+            "type": "string",
+            "maxLength": 60,
+            "title": "Campo",
+            "examples": [
+              "renda_per_capita"
+            ]
+          },
+          "operador": {
+            "type": "string",
+            "enum": [
+              "==",
+              "!=",
+              "<",
+              "<=",
+              ">",
+              ">=",
+              "in",
+              "entre"
+            ],
+            "title": "Operador",
+            "examples": [
+              "<="
+            ]
+          },
+          "valor": {
+            "type": "string",
+            "title": "Valor",
+            "examples": [
+              "218"
+            ]
+          },
+          "tipo_valor": {
+            "type": "string",
+            "enum": [
+              "numero",
+              "booleano",
+              "texto",
+              "lista",
+              "intervalo",
+              "parametro"
+            ],
+            "title": "Tipo Valor",
+            "default": "numero"
+          },
+          "obrigatoria": {
+            "type": "boolean",
+            "title": "Obrigatoria",
+            "default": true
+          },
+          "grupo_logico": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Grupo Logico",
+            "description": "Regras com o mesmo grupo são avaliadas em OR entre si."
+          },
+          "orientacao": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Orientacao"
+          },
+          "ordem": {
+            "type": "integer",
+            "title": "Ordem",
+            "default": 0
+          },
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "programa_id": {
+            "type": "integer",
+            "title": "Programa Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "codigo",
+          "descricao",
+          "campo",
+          "operador",
+          "valor",
+          "id",
+          "programa_id"
+        ],
+        "title": "RegraResposta"
+      },
+      "RequisitoLegivel": {
+        "properties": {
+          "codigo": {
+            "type": "string",
+            "title": "Codigo"
+          },
+          "descricao": {
+            "type": "string",
+            "title": "Descricao"
+          },
+          "obrigatorio": {
+            "type": "boolean",
+            "title": "Obrigatorio"
+          },
+          "condicao": {
+            "type": "string",
+            "title": "Condicao",
+            "description": "Regra traduzida para leitura humana."
+          }
+        },
+        "type": "object",
+        "required": [
+          "codigo",
+          "descricao",
+          "obrigatorio",
+          "condicao"
+        ],
+        "title": "RequisitoLegivel"
+      },
+      "RespostaErro": {
+        "properties": {
+          "erro": {
+            "$ref": "#/components/schemas/DetalheErro"
+          }
+        },
+        "type": "object",
+        "required": [
+          "erro"
+        ],
+        "title": "RespostaErro"
+      },
+      "ResultadoProgramaResposta": {
+        "properties": {
+          "programa_id": {
+            "type": "integer",
+            "title": "Programa Id"
+          },
+          "programa_nome": {
+            "type": "string",
+            "title": "Programa Nome"
+          },
+          "elegivel": {
+            "type": "boolean",
+            "title": "Elegivel"
+          },
+          "percentual_atendimento": {
+            "type": "number",
+            "title": "Percentual Atendimento"
+          },
+          "regras_atendidas": {
+            "items": {
+              "$ref": "#/components/schemas/AvaliacaoRegraResposta"
+            },
+            "type": "array",
+            "title": "Regras Atendidas",
+            "default": []
+          },
+          "pendencias": {
+            "items": {
+              "$ref": "#/components/schemas/AvaliacaoRegraResposta"
+            },
+            "type": "array",
+            "title": "Pendencias",
+            "default": []
+          }
+        },
+        "type": "object",
+        "required": [
+          "programa_id",
+          "programa_nome",
+          "elegivel",
+          "percentual_atendimento"
+        ],
+        "title": "ResultadoProgramaResposta"
+      },
+      "ResumoSimulacao": {
+        "properties": {
+          "programas_avaliados": {
+            "type": "integer",
+            "title": "Programas Avaliados"
+          },
+          "elegivel_em": {
+            "type": "integer",
+            "title": "Elegivel Em"
+          },
+          "quase_elegivel_em": {
+            "type": "integer",
+            "title": "Quase Elegivel Em",
+            "description": "Programas inelegíveis com 70% ou mais dos requisitos atendidos."
+          }
+        },
+        "type": "object",
+        "required": [
+          "programas_avaliados",
+          "elegivel_em",
+          "quase_elegivel_em"
+        ],
+        "title": "ResumoSimulacao"
+      },
+      "SimulacaoAnonima": {
+        "properties": {
+          "municipio": {
+            "type": "string",
+            "maxLength": 120,
+            "title": "Municipio",
+            "examples": [
+              "Salvador"
+            ]
+          },
+          "uf": {
+            "type": "string",
+            "maxLength": 2,
+            "minLength": 2,
+            "title": "Uf",
+            "examples": [
+              "BA"
+            ]
+          },
+          "renda_total_mensal": {
+            "type": "number",
+            "minimum": 0.0,
+            "title": "Renda Total Mensal",
+            "default": 0,
+            "examples": [
+              800.0
+            ]
+          },
+          "situacao_moradia": {
+            "type": "string",
+            "enum": [
+              "propria",
+              "alugada",
+              "cedida",
+              "situacao_rua"
+            ],
+            "title": "Situacao Moradia",
+            "default": "alugada"
+          },
+          "possui_cadunico": {
+            "type": "boolean",
+            "title": "Possui Cadunico",
+            "default": false
+          },
+          "membros": {
+            "items": {
+              "$ref": "#/components/schemas/MembroCriar"
+            },
+            "type": "array",
+            "minItems": 1,
+            "title": "Membros"
+          }
+        },
+        "type": "object",
+        "required": [
+          "municipio",
+          "uf",
+          "membros"
+        ],
+        "title": "SimulacaoAnonima",
+        "description": "Payload da simulação pública: nada é gravado no banco."
+      },
+      "SimulacaoResposta": {
+        "properties": {
+          "simulacao_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Simulacao Id"
+          },
+          "familia_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Familia Id"
+          },
+          "criado_em": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Criado Em"
+          },
+          "perfil_calculado": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Perfil Calculado"
+          },
+          "resumo": {
+            "$ref": "#/components/schemas/ResumoSimulacao"
+          },
+          "resultados": {
+            "items": {
+              "$ref": "#/components/schemas/ResultadoProgramaResposta"
+            },
+            "type": "array",
+            "title": "Resultados"
+          }
+        },
+        "type": "object",
+        "required": [
+          "perfil_calculado",
+          "resumo",
+          "resultados"
+        ],
+        "title": "SimulacaoResposta"
+      },
+      "SimulacaoResumo": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "familia_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Familia Id"
+          },
+          "criado_em": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Criado Em"
+          },
+          "total_elegiveis": {
+            "type": "integer",
+            "title": "Total Elegiveis",
+            "default": 0
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "familia_id",
+          "criado_em"
+        ],
+        "title": "SimulacaoResumo"
+      },
+      "TokenResposta": {
+        "properties": {
+          "access_token": {
+            "type": "string",
+            "title": "Access Token"
+          },
+          "token_type": {
+            "type": "string",
+            "title": "Token Type",
+            "default": "bearer"
+          },
+          "expira_em_minutos": {
+            "type": "integer",
+            "title": "Expira Em Minutos"
+          },
+          "usuario": {
+            "$ref": "#/components/schemas/UsuarioResposta"
+          }
+        },
+        "type": "object",
+        "required": [
+          "access_token",
+          "expira_em_minutos",
+          "usuario"
+        ],
+        "title": "TokenResposta"
+      },
+      "UsuarioAtualizar": {
+        "properties": {
+          "nome": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 120,
+                "minLength": 2
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Nome"
+          },
+          "papel": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "admin",
+                  "assistente_social",
+                  "cidadao"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Papel"
+          },
+          "ativo": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ativo"
+          },
+          "senha": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 72,
+                "minLength": 8
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Senha"
+          }
+        },
+        "type": "object",
+        "title": "UsuarioAtualizar"
+      },
+      "UsuarioCriar": {
+        "properties": {
+          "nome": {
+            "type": "string",
+            "maxLength": 120,
+            "minLength": 2,
+            "title": "Nome",
+            "examples": [
+              "Maria Souza"
+            ]
+          },
+          "email": {
+            "type": "string",
+            "format": "email",
+            "title": "Email",
+            "examples": [
+              "maria@cras.salvador.ba.gov.br"
+            ]
+          },
+          "senha": {
+            "type": "string",
+            "maxLength": 72,
+            "minLength": 8,
+            "title": "Senha",
+            "examples": [
+              "senhaSegura123"
+            ]
+          },
+          "papel": {
+            "type": "string",
+            "enum": [
+              "admin",
+              "assistente_social",
+              "cidadao"
+            ],
+            "title": "Papel",
+            "description": "Apenas administradores podem criar outro admin.",
+            "default": "cidadao"
+          }
+        },
+        "type": "object",
+        "required": [
+          "nome",
+          "email",
+          "senha"
+        ],
+        "title": "UsuarioCriar"
+      },
+      "UsuarioRegistro": {
+        "properties": {
+          "nome": {
+            "type": "string",
+            "maxLength": 120,
+            "minLength": 2,
+            "title": "Nome",
+            "examples": [
+              "Maria Souza"
+            ]
+          },
+          "email": {
+            "type": "string",
+            "format": "email",
+            "title": "Email",
+            "examples": [
+              "maria@exemplo.org"
+            ]
+          },
+          "senha": {
+            "type": "string",
+            "maxLength": 72,
+            "minLength": 8,
+            "title": "Senha",
+            "examples": [
+              "senhaSegura123"
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "nome",
+          "email",
+          "senha"
+        ],
+        "title": "UsuarioRegistro",
+        "description": "Cadastro público: o papel não é escolhido pelo usuário (sempre `cidadao`)."
+      },
+      "UsuarioResposta": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "nome": {
+            "type": "string",
+            "title": "Nome"
+          },
+          "email": {
+            "type": "string",
+            "format": "email",
+            "title": "Email"
+          },
+          "papel": {
+            "type": "string",
+            "enum": [
+              "admin",
+              "assistente_social",
+              "cidadao"
+            ],
+            "title": "Papel"
+          },
+          "ativo": {
+            "type": "boolean",
+            "title": "Ativo"
+          },
+          "criado_em": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Criado Em"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "nome",
+          "email",
+          "papel",
+          "ativo",
+          "criado_em"
+        ],
+        "title": "UsuarioResposta"
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "ctx": {
+            "type": "object",
+            "title": "Context"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      }
+    },
+    "securitySchemes": {
+      "OAuth2PasswordBearer": {
+        "type": "oauth2",
+        "flows": {
+          "password": {
+            "scopes": {},
+            "tokenUrl": "/api/v1/auth/login"
+          }
+        }
+      }
+    }
+  },
+  "tags": [
+    {
+      "name": "Elegibilidade",
+      "description": "Simulação do direito a benefícios."
+    },
+    {
+      "name": "Programas",
+      "description": "Catálogo de programas e seus requisitos."
+    },
+    {
+      "name": "Famílias",
+      "description": "Cadastro socioeconômico e composição familiar."
+    },
+    {
+      "name": "Gestão",
+      "description": "Parâmetros de referência e relatórios agregados."
+    },
+    {
+      "name": "Autenticação",
+      "description": "Registro, login e emissão de token JWT."
+    },
+    {
+      "name": "Usuários",
+      "description": "Gestão de contas e papéis (admin)."
+    },
+    {
+      "name": "Infraestrutura",
+      "description": "Healthcheck."
+    }
+  ]
+}

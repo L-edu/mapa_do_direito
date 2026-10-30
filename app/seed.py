@@ -203,6 +203,12 @@ USUARIOS = [
         "senha": "cras12345",
         "papel": "assistente_social",
     },
+    {
+        "nome": "Cidadã Demonstração",
+        "email": "cidadao@mapadodireito.org",
+        "senha": "cidadao12345",
+        "papel": "cidadao",
+    },
 ]
 
 
@@ -263,6 +269,7 @@ def popular() -> None:
         print("Seed concluído.")
         print("  admin@mapadodireito.org / admin12345")
         print("  cras@mapadodireito.org  / cras12345")
+        print("  cidadao@mapadodireito.org / cidadao12345")
     finally:
         db.close()
 

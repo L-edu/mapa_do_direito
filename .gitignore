@@ -1,8 +1,16 @@
+# Python
 __pycache__/
 *.py[cod]
 .venv/
 venv/
-.env
-*.db
 .pytest_cache/
 .ruff_cache/
+*.db
+
+# Ambiente
+.env
+
+# Node
+node_modules/
+dist/
+*.log

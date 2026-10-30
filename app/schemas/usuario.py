@@ -34,3 +34,18 @@ class TokenResposta(BaseModel):
     token_type: str = "bearer"
     expira_em_minutos: int
     usuario: UsuarioResposta
+
+
+class UsuarioRegistro(BaseModel):
+    """Cadastro público: o papel não é escolhido pelo usuário (sempre `cidadao`)."""
+
+    nome: str = Field(min_length=2, max_length=120, examples=["Maria Souza"])
+    email: EmailStr = Field(examples=["maria@exemplo.org"])
+    senha: str = Field(min_length=8, max_length=72, examples=["senhaSegura123"])
+
+
+class UsuarioAtualizar(BaseModel):
+    nome: str | None = Field(None, min_length=2, max_length=120)
+    papel: Papel | None = None
+    ativo: bool | None = None
+    senha: str | None = Field(None, min_length=8, max_length=72)

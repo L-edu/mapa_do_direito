@@ -14,7 +14,7 @@ from app.core.seguranca import (
 from app.database import get_db
 from app.models import Usuario
 from app.schemas.comum import ERROS_PADRAO
-from app.schemas.usuario import LoginRequisicao, TokenResposta, UsuarioCriar, UsuarioResposta
+from app.schemas.usuario import LoginRequisicao, TokenResposta, UsuarioRegistro, UsuarioResposta
 
 router = APIRouter(prefix="/api/v1/auth", tags=["Autenticação"])
 
@@ -27,21 +27,20 @@ DB = Annotated[Session, Depends(get_db)]
     status_code=status.HTTP_201_CREATED,
     summary="Cria uma nova conta",
     description=(
-        "Cadastro público. O papel `admin` é ignorado neste endpoint: contas "
-        "administrativas são criadas pelo seed ou promovidas por outro administrador."
+        "Cadastro público. A conta nasce sempre com o papel `cidadao`; contas de "
+        "assistente social e administrador são criadas por um administrador em `/usuarios`."
     ),
 )
-def registrar(dados: UsuarioCriar, db: DB):
+def registrar(dados: UsuarioRegistro, db: DB):
     existente = db.scalar(select(Usuario).where(Usuario.email == dados.email))
     if existente:
         raise HTTPException(status.HTTP_409_CONFLICT, "Já existe uma conta com este e-mail.")
 
-    papel = "cidadao" if dados.papel == "admin" else dados.papel
     usuario = Usuario(
         nome=dados.nome,
         email=dados.email,
         senha_hash=gerar_hash_senha(dados.senha),
-        papel=papel,
+        papel="cidadao",
     )
     db.add(usuario)
     db.commit()
